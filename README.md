@@ -141,3 +141,4 @@ node seed-db.js
 ## 📝 License
 
 This project is built for Smart India Hackathon 2026 — SIET internal qualifier.
+ALL the best 
