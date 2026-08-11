@@ -60,3 +60,49 @@
 //   });
 //
 // ============================================================================
+
+
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+// const Ward = require('./models/Ward');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.json({ message: "Urban Heatwave API is running!" });
+});
+
+const PORT = process.env.PORT || 5000;
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("Local MongoDB Connected successfully");
+
+    // TEMPORARY DUMMY DATA SCRIPT (already inserted — keep commented)
+    // const checkWard = await Ward.findOne({ wardId: "W-01" });
+    // if (!checkWard) {
+    //   await Ward.create({
+    //     wardId: "W-01",
+    //     name: "Central Ward",
+    //     cityId: "city-01",
+    //     population: 15000,
+    //     pctElderly: 0.15,
+    //     pctOutdoorWorkers: 0.30,
+    //     greenCoverPct: 0.10,
+    //     boundary: {
+    //       type: "Polygon",
+    //       coordinates: [[[77.2, 28.6], [77.3, 28.6], [77.3, 28.7], [77.2, 28.7], [77.2, 28.6]]]
+    //     }
+    //   });
+    //   console.log("Dummy Ward inserted!");
+    // }
+
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  })
+  .catch((err) => console.error("MongoDB Connection Error:", err));
