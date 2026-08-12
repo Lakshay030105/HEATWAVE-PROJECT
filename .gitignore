@@ -64,3 +64,4 @@ desktop.ini
 coverage/
 .nyc_output/
 *.tgz
+ai-service/data/raw/*.csv
