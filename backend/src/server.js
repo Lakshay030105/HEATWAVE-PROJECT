@@ -74,6 +74,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ==========================================
+// 1. IMPORT ROUTE FILES
+// ==========================================
+const wardRoutes = require('./routes/wards.routes');
+const resourceRoutes = require('./routes/resources.routes');
+const riskRoutes = require('./routes/risk.routes');
+const alertRoutes = require('./routes/alerts.routes');
+const simulateRoutes = require('./routes/simulate.routes');
+
+// ==========================================
+// 2. MOUNT ROUTES TO EXACT URL PATHS
+// ==========================================
+app.use('/api/wards', wardRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/risk', riskRoutes); 
+app.use('/api/alerts', alertRoutes);
+app.use('/api/simulate', simulateRoutes);
+
 app.get('/', (req, res) => {
   res.json({ message: "Urban Heatwave API is running!" });
 });

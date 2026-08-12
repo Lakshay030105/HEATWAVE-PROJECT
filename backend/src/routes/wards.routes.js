@@ -41,3 +41,17 @@
 //   This file just defines routes and connects them to controller functions
 //
 // ============================================================================
+
+const express = require('express');
+const router = express.Router();
+
+// Import the controller we built earlier
+const wardController = require('../controllers/wardController');
+
+// Route 1: GET /api/wards -> Fetches all wards (maps to getAllWards in controller)
+router.get('/', wardController.getAllWards);
+
+// Route 2: GET /api/wards/:wardId -> Fetches a single ward by ID
+router.get('/:wardId', wardController.getWardById);
+
+module.exports = router;
