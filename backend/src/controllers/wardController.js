@@ -72,7 +72,6 @@ exports.getWardById = async (req, res, next) => {
       ...ward,
       latestRisk: latestRisk || null
     };
-
     res.status(200).json({ success: true, data: combinedWard });
   } catch (err) {
     console.error("Error fetching single ward:", err);
