@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
+import AarogyaBrand from '../Logo/Logo';
 
 const NAV_ITEMS = [
   { section: 'MAIN', items: [
@@ -63,11 +64,9 @@ function Sidebar({ open, onClose }) {
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="fixed top-0 left-0 h-full w-72 bg-[#0B0E14] border-r border-white/10 z-[9999] flex flex-col font-sans overflow-y-auto"
           >
-            {/* Close button */}
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-wider">
-                <MapPin className="w-3.5 h-3.5 text-teal-400" /> Jaipur, Rajasthan
-              </div>
+            {/* Header with Logo */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <AarogyaBrand size="sm" />
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"

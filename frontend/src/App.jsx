@@ -10,7 +10,8 @@ import EmergencyPage from './pages/EmergencyPage';
 import CitizenReportsPage from './pages/CitizenReportsPage';
 import Sidebar from './components/Sidebar/Sidebar';
 import { useApp } from './context/AppContext';
-import { Flame, ShieldAlert, Menu } from 'lucide-react';
+import AarogyaBrand from './components/Logo/Logo';
+import { ShieldAlert, Menu } from 'lucide-react';
 
 function App() {
   const { loading, wards } = useApp();
@@ -45,10 +46,7 @@ function App() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
-            <Flame className="w-6 h-6 text-orange-500" />
-          </div>
-          <span className="text-lg font-bold tracking-tight text-white">Jaipur Heatwave EWS</span>
+          <AarogyaBrand />
         </div>
         
         {/* Segmented Pill Toggle Navigation */}
