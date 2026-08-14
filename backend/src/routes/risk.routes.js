@@ -42,7 +42,4 @@ router.get('/history/:wardId', riskController.getRiskHistory);
 // (This connects to the map for color-coding)
 router.get('/latest', riskController.getLatestRisks);
 
-// POST /api/risk/recompute -> proxies to the AI service, which writes dailyrisks
-router.post('/recompute', riskController.recomputeRisk);
-
 module.exports = router;
