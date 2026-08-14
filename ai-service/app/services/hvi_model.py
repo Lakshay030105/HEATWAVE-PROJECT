@@ -70,3 +70,42 @@
 #   - Results written to MongoDB dailyrisks collection (hvi field)
 #
 # ============================================================================
+
+import os
+
+# Weights (override via env, defaults documented in .env.example)
+HVI_WEIGHT_LST = float(os.getenv("HVI_WEIGHT_LST", 0.35))
+HVI_WEIGHT_ELDERLY = float(os.getenv("HVI_WEIGHT_ELDERLY", 0.25))
+HVI_WEIGHT_OUTDOOR = float(os.getenv("HVI_WEIGHT_OUTDOOR", 0.25))
+HVI_WEIGHT_GREEN = float(os.getenv("HVI_WEIGHT_GREEN", 0.15))
+
+# Land surface temperature range used to normalise into 0-1
+LST_MIN_C = 25.0
+LST_MAX_C = 50.0
+
+
+def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
+    return max(low, min(high, value))
+
+
+def compute_hvi(ward_data: dict) -> float:
+    """Weighted Heat Vulnerability Index (0-100) for a ward.
+
+    Expects lst_temp (Celsius), pct_elderly, pct_outdoor_workers and
+    green_cover_pct as fractions between 0 and 1.
+    """
+    lst = _clamp(
+        (float(ward_data.get("lst_temp", LST_MIN_C)) - LST_MIN_C)
+        / (LST_MAX_C - LST_MIN_C)
+    )
+    elderly = _clamp(float(ward_data.get("pct_elderly", 0)))
+    outdoor = _clamp(float(ward_data.get("pct_outdoor_workers", 0)))
+    green_deficit = 1 - _clamp(float(ward_data.get("green_cover_pct", 0)))
+
+    score = (
+        HVI_WEIGHT_LST * lst
+        + HVI_WEIGHT_ELDERLY * elderly
+        + HVI_WEIGHT_OUTDOOR * outdoor
+        + HVI_WEIGHT_GREEN * green_deficit
+    )
+    return round(score * 100, 2)
