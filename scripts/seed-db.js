@@ -1,3 +1,6 @@
+const dns = require('dns');
+try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (_) {}
+
 const path = require('path');
 const backendModules = path.join(__dirname, '../backend/node_modules');
 const dotenv = require(path.join(backendModules, 'dotenv'));

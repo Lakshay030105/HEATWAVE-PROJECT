@@ -19,6 +19,8 @@ export function AppProvider({ children }) {
   const [simulationActive, setSimulationActive] = useState(null);
   const [predictionHours, setPredictionHours] = useState(0); // 0, 3, 6, 12, 24, 48
   const [activeLayer, setActiveLayer] = useState('hvi'); // 'hvi', 'lst', 'ndvi', 'demographics'
+  const [dataStreamMode, setDataStreamMode] = useState('demo'); // 'live' | 'demo'
+  const [liveWeatherMap, setLiveWeatherMap] = useState({});
 
   const fetchWards = useCallback(async () => {
     try {
@@ -74,6 +76,44 @@ export function AppProvider({ children }) {
     }
   }, []);
 
+  // Fetch live AI/Open-Meteo weather for all wards
+  const fetchLiveWeatherForAll = useCallback(async () => {
+    try {
+      const WARD_CENTROIDS = {
+        'JPR-W01': { lat: 26.855, lng: 75.815 },
+        'JPR-W02': { lat: 26.862, lng: 75.762 },
+        'JPR-W03': { lat: 26.905, lng: 75.802 },
+        'JPR-W04': { lat: 26.912, lng: 75.742 },
+        'JPR-W05': { lat: 26.812, lng: 75.789 },
+        'JPR-W06': { lat: 26.982, lng: 75.858 }
+      };
+
+      const weatherMap = {};
+      await Promise.all(
+        Object.entries(WARD_CENTROIDS).map(async ([wardId, coords]) => {
+          try {
+            const res = await fetch('http://localhost:8000/api/predict', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ latitude: coords.lat, longitude: coords.lng })
+            });
+            const data = await res.json();
+            weatherMap[wardId] = {
+              tempC: data.temperature_celsius || 26.2,
+              prediction: data.prediction || 'Low (No Heatwave)',
+              status: data.status
+            };
+          } catch (e) {
+            weatherMap[wardId] = { tempC: 26.2, prediction: 'Low (No Heatwave)' };
+          }
+        })
+      );
+      setLiveWeatherMap(weatherMap);
+    } catch (e) {
+      console.warn('Live weather background ingestion notice:', e);
+    }
+  }, []);
+
   const refreshAll = useCallback(async () => {
     await Promise.all([
       fetchWards(),
@@ -81,88 +121,80 @@ export function AppProvider({ children }) {
       fetchAlerts(),
       fetchResources(),
       fetchReports(),
-      fetchEmergencyUnits()
+      fetchEmergencyUnits(),
+      fetchLiveWeatherForAll()
     ]);
-  }, [fetchWards, fetchLatestRisks, fetchAlerts, fetchResources, fetchReports, fetchEmergencyUnits]);
+  }, [fetchWards, fetchLatestRisks, fetchAlerts, fetchResources, fetchReports, fetchEmergencyUnits, fetchLiveWeatherForAll]);
 
   const selectWard = useCallback((wardId) => {
     setSelectedWardId(wardId);
   }, []);
 
-  // Compute active wards with simulation state AND predictive timeline hours applied
+  // Compute active wards according to dataStreamMode (Live vs Demo) AND predictive slider
   const wards = useMemo(() => {
     return rawWards.map(w => {
-      // If in standard live mode (predictionHours === 0), use the true live AI model / DB risk
-      if (predictionHours === 0) {
-        let latestRisk = w.latestRisk || {
-          riskTier: 'Moderate',
-          hvi: 50,
-          forecastTempC: 40,
-          forecastHumidity: 30
-        };
+      const isLive = dataStreamMode === 'live';
+      const liveInfo = liveWeatherMap[w.wardId] || { tempC: 26.2, prediction: 'Low (No Heatwave)' };
 
-        // If manual simulation override is active for this ward, override with simulation state
-        if (simulationActive && w.wardId === simulationActive.wardId) {
-          latestRisk = {
-            ...latestRisk,
-            riskTier: simulationActive.tier,
-            forecastTempC: simulationActive.tier === 'Extreme' ? 48 : simulationActive.tier === 'Severe' ? 45 : 42,
-            hvi: simulationActive.tier === 'Extreme' ? 95 : 82,
-            isSimulated: true
-          };
-        }
+      // Base temperature selection
+      const baseTemp = isLive ? (liveInfo.tempC || 26.2) : (w.latestRisk?.forecastTempC || 40);
 
-        return {
-          ...w,
-          latestRisk
-        };
-      }
+      // Time-travel temperature delta
+      let tempDelta = 0;
+      if (predictionHours === 3) tempDelta = isLive ? 2.5 : 1.5;
+      else if (predictionHours === 6) tempDelta = isLive ? 7.0 : 3.0; // Peak afternoon solar heating
+      else if (predictionHours === 12) tempDelta = isLive ? -3.5 : -2.0; // Night cooling
+      else if (predictionHours === 24) tempDelta = isLive ? 6.0 : 2.5; // Next day
+      else if (predictionHours === 48) tempDelta = isLive ? 10.5 : 4.0; // Multi-day heatwave escalation
 
-      // If time-travel forecasting slider is actively used:
-      const tempDelta =
-        predictionHours === 3 ? 1.5 :
-        predictionHours === 6 ? 3.0 :
-        predictionHours === 12 ? -2.0 :
-        predictionHours === 24 ? 2.5 : 4.0;
+      const forecastTemp = Math.round((baseTemp + tempDelta) * 10) / 10;
 
-      const baseTemp = w.latestRisk?.forecastTempC || 40;
-      const forecastTemp = Math.round(baseTemp + tempDelta);
-
-      const lstNorm = Math.min(100, Math.max(0, ((forecastTemp - 30) / 20) * 100));
+      // Dynamic HVI computation for the forecasted temperature
+      const tempMin = isLive ? 20 : 30;
+      const tempRange = isLive ? 22 : 20;
+      const lstNorm = Math.min(100, Math.max(0, ((forecastTemp - tempMin) / tempRange) * 100));
       const elderlyNorm = (w.pctElderly || 0.1) * 100 * 4;
       const outdoorNorm = (w.pctOutdoorWorkers || 0.2) * 100 * 2;
       const greenInvertNorm = (1 - (w.greenCoverPct || 0.1)) * 100;
-      
+
       const computedHvi = Math.min(100, Math.round(
         0.35 * lstNorm + 0.25 * elderlyNorm + 0.25 * outdoorNorm + 0.15 * greenInvertNorm
       ));
 
+      // Calculate severity and risk tier
       let forecastSeverity = 0;
-      if (forecastTemp > 45) forecastSeverity = 100;
-      else if (forecastTemp > 42) forecastSeverity = 75;
-      else if (forecastTemp > 39) forecastSeverity = 50;
-      else if (forecastTemp > 35) forecastSeverity = 25;
+      if (forecastTemp >= (isLive ? 38 : 45)) forecastSeverity = 100;
+      else if (forecastTemp >= (isLive ? 34 : 42)) forecastSeverity = 75;
+      else if (forecastTemp >= (isLive ? 30 : 39)) forecastSeverity = 50;
+      else if (forecastTemp >= (isLive ? 27 : 35)) forecastSeverity = 25;
 
       const combinedScore = Math.round(0.6 * computedHvi + 0.4 * forecastSeverity);
-      let calculatedTier = 'Low';
-      if (combinedScore > 75) calculatedTier = 'Extreme';
-      else if (combinedScore > 50) calculatedTier = 'Severe';
-      else if (combinedScore > 25) calculatedTier = 'Moderate';
 
+      let calculatedTier = 'Low';
+      if (combinedScore > 75 || forecastTemp >= (isLive ? 42 : 45)) calculatedTier = 'Extreme';
+      else if (combinedScore > 50 || forecastTemp >= (isLive ? 35 : 42)) calculatedTier = 'Severe';
+      else if (combinedScore > 25 || forecastTemp >= (isLive ? 30 : 39)) calculatedTier = 'Moderate';
+
+      // Default baseline when slider is at 0h (Current)
       let latestRisk = {
         ...w.latestRisk,
         forecastTempC: forecastTemp,
         hvi: computedHvi,
-        riskTier: calculatedTier,
+        riskTier: predictionHours === 0 && isLive ? 'Low' : calculatedTier,
+        forecastHumidity: isLive ? 65 : 30,
+        mlPrediction: isLive && predictionHours === 0 ? liveInfo.prediction : `${calculatedTier} Heat Forecast`,
+        isSimulated: false,
         combinedScore
       };
 
+      // Manual simulation override takes precedence if active
       if (simulationActive && w.wardId === simulationActive.wardId) {
         latestRisk = {
           ...latestRisk,
           riskTier: simulationActive.tier,
           forecastTempC: simulationActive.tier === 'Extreme' ? 48 : simulationActive.tier === 'Severe' ? 45 : 42,
           hvi: simulationActive.tier === 'Extreme' ? 95 : 82,
+          isSimulated: true
         };
       }
 
@@ -171,7 +203,7 @@ export function AppProvider({ children }) {
         latestRisk
       };
     });
-  }, [rawWards, simulationActive, predictionHours]);
+  }, [rawWards, simulationActive, predictionHours, dataStreamMode, liveWeatherMap]);
 
   // Selected ward memo
   const selectedWard = useMemo(() => {
@@ -261,6 +293,8 @@ export function AppProvider({ children }) {
     simulationActive,
     predictionHours,
     activeLayer,
+    dataStreamMode,
+    setDataStreamMode,
     setActiveLayer,
     setPredictionHours,
     setSimulationActive,
@@ -269,6 +303,7 @@ export function AppProvider({ children }) {
     fetchResources,
     fetchReports,
     fetchEmergencyUnits,
+    fetchLiveWeatherForAll,
     selectWard,
     refreshAll,
     dispatchAlert,

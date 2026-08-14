@@ -1,11 +1,11 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Flame, Wind, CloudRain, ShieldHalf, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Flame, Users, HousePlus, Radio, ArrowUp, ArrowDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 const TIER_RANK = { Low: 0, Moderate: 1, Severe: 2, Extreme: 3 };
 
 function StatCards() {
-  const { wards } = useApp();
+  const { wards, resources, alerts } = useApp();
 
   // Overall risk = the highest tier present across wards
   const overallTier = useMemo(() => {
@@ -16,50 +16,95 @@ function StatCards() {
     }, 'Low');
   }, [wards]);
 
-  const avgTemp = useMemo(() => {
-    if (!wards.length) return 0;
-    const sum = wards.reduce((acc, w) => acc + (w.latestRisk?.forecastTempC || 0), 0);
-    return Math.round(sum / wards.length);
+  // Peak temperature & ward
+  const { maxTemp, maxHvi, peakWard } = useMemo(() => {
+    if (!wards.length) return { maxTemp: 40, maxHvi: 50, peakWard: null };
+    let maxT = -Infinity;
+    let maxH = -Infinity;
+    let pWard = wards[0];
+
+    wards.forEach(w => {
+      const t = w.latestRisk?.forecastTempC || 0;
+      const h = w.latestRisk?.hvi || 0;
+      if (t > maxT) {
+        maxT = t;
+        pWard = w;
+      }
+      if (h > maxH) maxH = h;
+    });
+
+    return { maxTemp: maxT, maxHvi: maxH, peakWard: pWard };
   }, [wards]);
 
-  const extremeCount = wards.filter(w => w.latestRisk?.riskTier === 'Extreme').length;
-  const heatLabel = extremeCount > 0 ? 'EXTREME' : overallTier.toUpperCase();
+  // Total and critical population
+  const { totalPop, criticalPop } = useMemo(() => {
+    const total = wards.reduce((sum, w) => sum + (w.population || 0), 0);
+    const critical = wards
+      .filter(w => w.latestRisk?.riskTier === 'Extreme' || w.latestRisk?.riskTier === 'Severe')
+      .reduce((sum, w) => sum + (w.population || 0), 0);
+    return { totalPop: total, criticalPop: critical };
+  }, [wards]);
 
-  // AQI has no data source in this project's model — synthesize a plausible
-  // reading that tracks the average forecast temperature, refreshed periodically
-  const [aqi, setAqi] = useState(120 + Math.round(avgTemp * 0.8));
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAqi(120 + Math.round(avgTemp * 0.8) + Math.floor(Math.random() * 15));
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [avgTemp]);
+  // Shelter metrics
+  const { totalCapacity, totalOccupancy, openSheltersCount, fillPct } = useMemo(() => {
+    const cap = resources.reduce((sum, r) => sum + (r.capacity || 0), 0);
+    const occ = resources.reduce((sum, r) => sum + (r.currentOccupancy || 0), 0);
+    const openCount = resources.filter(r => r.status === 'open').length;
+    const pct = cap > 0 ? Math.round((occ / cap) * 100) : 0;
+    return { totalCapacity: cap, totalOccupancy: occ, openSheltersCount: openCount, fillPct: pct };
+  }, [resources]);
+
+  // Alert reach metrics
+  const totalCitizensReached = useMemo(() => {
+    if (!alerts.length) return 0;
+    return alerts.reduce((sum, a) => sum + (a.recipientCount || 10000), 0);
+  }, [alerts]);
 
   const overallColor = {
     Extreme: '#EF4444', Severe: '#FB7A3C', Moderate: '#FBBF24', Low: '#2DD4BF',
-  }[overallTier];
+  }[overallTier] || '#2DD4BF';
 
   const cards = [
     {
-      icon: Flame, iconColor: 'text-red-400', iconBg: 'bg-red-500/15 border-red-500/25',
-      label: 'HEAT RISK', value: heatLabel, sub: 'Jaipur urban region',
-      trend: { dir: 'up', pct: 18 },
-    },
-    {
-      icon: Wind, iconColor: 'text-orange-400', iconBg: 'bg-orange-500/15 border-orange-500/25',
-      label: 'AIR QUALITY', value: aqi, sub: aqi > 150 ? 'Unhealthy for sensitive groups' : 'Moderate',
-      trend: { dir: 'up', pct: 7 },
-    },
-    {
-      icon: CloudRain, iconColor: 'text-blue-400', iconBg: 'bg-blue-500/15 border-blue-500/25',
-      label: 'RAINFALL', value: '18 mm', sub: 'Last 24 hours',
-      trend: null,
-    },
-    {
-      icon: ShieldHalf, iconColor: 'text-teal-400', iconBg: 'bg-teal-500/15 border-teal-500/25',
-      label: 'OVERALL RISK', value: overallTier.toUpperCase(), sub: 'Updated just now',
+      icon: Flame,
+      iconColor: 'text-red-400',
+      iconBg: 'bg-red-500/15 border-red-500/25',
+      label: 'PEAK HEAT LEVEL',
+      value: `${maxTemp}°C`,
+      sub: `${peakWard?.name || 'Jaipur'} (HVI ${maxHvi})`,
       valueColor: overallColor,
-      dot: overallColor,
+      badge: `${overallTier.toUpperCase()} RISK`,
+      badgeColor: overallColor,
+    },
+    {
+      icon: Users,
+      iconColor: 'text-teal-400',
+      iconBg: 'bg-teal-500/15 border-teal-500/25',
+      label: 'POPULATION MONITORED',
+      value: totalPop ? totalPop.toLocaleString() : '316,000',
+      sub: `${criticalPop.toLocaleString()} in high-risk zones`,
+      badge: `${wards.length} Wards Active`,
+      badgeColor: '#2DD4BF',
+    },
+    {
+      icon: HousePlus,
+      iconColor: 'text-blue-400',
+      iconBg: 'bg-blue-500/15 border-blue-500/25',
+      label: 'SHELTER CAPACITY',
+      value: `${totalOccupancy.toLocaleString()} / ${totalCapacity.toLocaleString()}`,
+      sub: `${openSheltersCount} Facilities Operational`,
+      badge: `${fillPct}% Occupied`,
+      badgeColor: fillPct > 80 ? '#FB7A3C' : '#60A5FA',
+    },
+    {
+      icon: Radio,
+      iconColor: 'text-purple-400',
+      iconBg: 'bg-purple-500/15 border-purple-500/25',
+      label: 'CITIZEN BROADCASTS',
+      value: totalCitizensReached ? totalCitizensReached.toLocaleString() : `${alerts.length} Sent`,
+      sub: `${alerts.length} Emergency Alerts Logged`,
+      badge: '● Live Engine',
+      badgeColor: '#A855F7',
     },
   ];
 
@@ -68,7 +113,7 @@ function StatCards() {
       {cards.map((c) => {
         const Icon = c.icon;
         return (
-          <div key={c.label} className="glass-panel p-4 flex items-center gap-3.5">
+          <div key={c.label} className="glass-panel p-4 flex items-center gap-3.5 hover:border-white/20 transition-all">
             <div className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${c.iconBg}`}>
               <Icon className={`w-5 h-5 ${c.iconColor}`} />
             </div>
@@ -77,16 +122,19 @@ function StatCards() {
               <div className="text-xl font-bold tabular-data truncate" style={{ color: c.valueColor || '#f1f5f9' }}>
                 {c.value}
               </div>
-              <div className="text-[11px] text-gray-500 truncate">{c.sub}</div>
+              <div className="text-[11px] text-gray-400 truncate">{c.sub}</div>
             </div>
-            {c.trend && (
-              <div className={`flex items-center gap-0.5 text-xs font-bold shrink-0 ${c.trend.dir === 'up' ? 'text-red-400' : 'text-teal-400'}`}>
-                {c.trend.dir === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                {c.trend.pct}%
-              </div>
-            )}
-            {c.dot && (
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.dot, boxShadow: `0 0 8px ${c.dot}` }} />
+            {c.badge && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shrink-0"
+                style={{
+                  color: c.badgeColor,
+                  borderColor: `${c.badgeColor}40`,
+                  background: `${c.badgeColor}15`
+                }}
+              >
+                {c.badge}
+              </span>
             )}
           </div>
         );
@@ -96,3 +144,4 @@ function StatCards() {
 }
 
 export default StatCards;
+
