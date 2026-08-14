@@ -74,8 +74,8 @@ export const dispatchUnitApi = (unitId, wardId) =>
 export const simulateHeatwave = (wardId, tier) =>
   api.post('/simulate', { wardId, tier }).catch(() => ({ success: true, wardId, tier, message: 'Simulation active (mock)' }));
 
-export const recomputeMLPipeline = () =>
-  axios.post('http://localhost:8000/internal/recompute').catch(() => ({ success: true, message: 'ML Pipeline recomputed on Jaipur dataset' }));
+// Goes through the backend, which proxies to the AI service (AI_SERVICE_URL)
+export const recomputeMLPipeline = () => api.post('/risk/recompute');
 
 
 // ============================================================================
