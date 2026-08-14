@@ -275,8 +275,8 @@ def fetch_live_weather(lat, lon):
         return fallback_df
 
 
-@app.post("/predict")
-def run_model(request: FrontendRequest):
+@app.post("/api/predict")
+async def get_prediction(request: FrontendRequest):
     # 1. Fetch exactly 72 hours of live weather data as a DataFrame
     input_df = fetch_live_weather(request.latitude, request.longitude)
 
