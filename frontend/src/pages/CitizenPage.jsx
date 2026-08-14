@@ -49,22 +49,41 @@ function CitizenPage() {
           </motion.div>
         )}
 
-        {/* Hero Section */}
-        <div className="text-center py-6 mb-2">
+        {/* Hero Section with Aarogya Chhaya Emblem */}
+        <div className="text-center py-6 mb-2 flex flex-col items-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-20 h-20 rounded-full overflow-hidden border-2 border-orange-500/40 shadow-xl shadow-orange-500/20 mb-4"
+          >
+            <img src="/logo-emblem.jpg" alt="Aarogya Chhaya" className="w-full h-full object-cover" />
+          </motion.div>
+
           <motion.h1 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tight mb-4"
+            className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2"
           >
-            Jaipur Heatwave Alert System
+            <span className="text-white">AAROGYA </span>
+            <span className="text-teal-400">CHHAYA</span>
           </motion.h1>
-          <motion.p 
+
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="text-gray-400 text-lg max-w-2xl mx-auto font-medium"
+            className="text-xs font-mono font-bold tracking-widest text-orange-400 uppercase mb-3"
           >
-            Stay informed, stay safe. Check your ward's heat risk, locate cooling centers, and report infrastructure issues directly to city authorities.
+            Data-Driven Thermal Mitigation · Jaipur Region
+          </motion.div>
+
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="text-gray-400 text-sm md:text-base max-w-2xl mx-auto font-medium leading-relaxed"
+          >
+            Stay informed, stay protected. Check real-time ward heat risk, locate nearest cooling shelters & hydration points, and report ground incidents directly.
           </motion.p>
         </div>
 

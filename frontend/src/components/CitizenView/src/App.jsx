@@ -2,16 +2,9 @@ import React, { useState } from 'react';
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import AuthorityDashboard from './pages/AuthorityDashboard';
 import CitizenPage from './pages/CitizenPage';
-import RiskMapPage from './pages/RiskMapPage';
-import AlertsPage from './pages/AlertsPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import SheltersPage from './pages/SheltersPage';
-import EmergencyPage from './pages/EmergencyPage';
-import CitizenReportsPage from './pages/CitizenReportsPage';
 import Sidebar from './components/Sidebar/Sidebar';
 import { useApp } from './context/AppContext';
-import AarogyaBrand from './components/Logo/Logo';
-import { ShieldAlert, Menu } from 'lucide-react';
+import { Flame, ShieldAlert, Menu } from 'lucide-react';
 
 function App() {
   const { loading, wards } = useApp();
@@ -46,7 +39,10 @@ function App() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <AarogyaBrand />
+          <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+            <Flame className="w-6 h-6 text-orange-500" />
+          </div>
+          <span className="text-lg font-bold tracking-tight text-white">Jaipur Heatwave EWS</span>
         </div>
         
         {/* Segmented Pill Toggle Navigation */}
@@ -63,30 +59,6 @@ function App() {
             }
           >
             Authority Dashboard
-          </NavLink>
-          <NavLink
-            to="/map"
-            className={({ isActive }) => 
-              `px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-                isActive 
-                  ? 'bg-[#2DD4BF] text-black shadow-md shadow-teal-500/20' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`
-            }
-          >
-            Risk Map
-          </NavLink>
-          <NavLink
-            to="/alerts"
-            className={({ isActive }) => 
-              `px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-                isActive 
-                  ? 'bg-[#2DD4BF] text-black shadow-md shadow-teal-500/20' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`
-            }
-          >
-            Alerts
           </NavLink>
           <NavLink
             to="/citizen"
@@ -150,12 +122,6 @@ function App() {
         <main className="flex-1 w-full">
           <Routes>
             <Route path="/" element={<AuthorityDashboard />} />
-            <Route path="/map" element={<RiskMapPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/shelters" element={<SheltersPage />} />
-            <Route path="/emergency" element={<EmergencyPage />} />
-            <Route path="/reports" element={<CitizenReportsPage />} />
             <Route path="/citizen" element={<CitizenPage />} />
           </Routes>
         </main>
