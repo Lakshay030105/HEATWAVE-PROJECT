@@ -9,15 +9,22 @@ const alertLogSchema = new mongoose.Schema({
   tier: { 
     type: String, 
     required: true, 
-    enum: ['Severe', 'Extreme'] 
+    enum: ['Low', 'Moderate', 'Severe', 'Extreme'] 
   },
   channel: { 
     type: String, 
     required: true, 
     enum: ['sms', 'voice', 'push'] 
   },
+  message: {
+    type: String
+  },
+  recipientCount: {
+    type: Number,
+    default: 1
+  },
   recipientPhone: { 
-    type: String // The masking mentioned in the comments is handled later in the API route, not the database schema.
+    type: String
   },
   sentAt: { 
     type: Date, 
@@ -25,8 +32,7 @@ const alertLogSchema = new mongoose.Schema({
   },
   dedupeKey: { 
     type: String, 
-    required: true, 
-    unique: true 
+    sparse: true 
   },
   status: { 
     type: String, 

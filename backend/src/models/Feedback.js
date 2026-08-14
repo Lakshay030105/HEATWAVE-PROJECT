@@ -8,7 +8,7 @@ const feedbackSchema = new mongoose.Schema({
   reportType: {
     type: String,
     required: true,
-    enum: ['heat_illness', 'infrastructure_issue', 'general'],
+    enum: ['heat_illness', 'infrastructure_issue', 'general', 'water_shortage'],
   },
   description: {
     type: String,
@@ -18,6 +18,19 @@ const feedbackSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['mild', 'moderate', 'severe'],
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'investigating', 'resolved'],
+    default: 'pending',
+  },
+  location: {
+    type: String,
+    default: '',
+  },
+  resolutionNote: {
+    type: String,
+    default: '',
   },
   reportedAt: {
     type: Date,
@@ -29,3 +42,4 @@ const feedbackSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Feedback', feedbackSchema);
+

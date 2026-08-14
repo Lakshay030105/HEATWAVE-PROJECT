@@ -26,6 +26,7 @@ const riskRoutes = require('./routes/risk.routes');
 const alertRoutes = require('./routes/alerts.routes');
 const simulateRoutes = require('./routes/simulate.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
+const emergencyRoutes = require('./routes/emergency.routes');
 const { startWatcher } = require('./jobs/riskWatcher.cron');
 
 // 2. Mount Routes
@@ -35,6 +36,7 @@ app.use('/api/risk', riskRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/simulate', simulateRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/emergency', emergencyRoutes);
 
 // Health Check
 app.get('/', (req, res) => {
