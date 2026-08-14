@@ -2,12 +2,22 @@ from typing import Annotated
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from datetime import datetime
-from pymongo import MongoClient
+from datetime import datetime, timezone
+import os
 import requests
-import ee
 import joblib
-import pickle
+import pandas as pd
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from dotenv import load_dotenv
+
+# Safe optional GEE import
+try:
+    import ee
+except ImportError:
+    ee = None
+
+load_dotenv()
 
 # 1. Initialize FastAPI
 app = FastAPI(
@@ -23,10 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-import pandas as pd
-import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
@@ -123,36 +129,51 @@ class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
         return output
 
 
-import __main__
-
-__main__.TemporalFeatureEngineer = TemporalFeatureEngineer
+# Expose custom transformer dynamically to __main__ for joblib/pickle unpickling
+import sys
+if "__main__" in sys.modules:
+    setattr(sys.modules["__main__"], "TemporalFeatureEngineer", TemporalFeatureEngineer)
 
 
 # 2. Initialize Google Earth Engine
-try:
-    ee.Initialize(project="heatwavemitigationsystem")
-    print("Google Earth Engine initialized successfully!")
-except Exception as e:
-    print(f"GEE Initialization failed! Error: {e}")
+gee_available = False
+if ee is not None:
+    try:
+        ee.Initialize(project="heatwavemitigationsystem")
+        gee_available = True
+        print("Google Earth Engine initialized successfully!")
+    except Exception as e:
+        print(f"GEE Initialization notice: {e}. Live predictions will use Open-Meteo data.")
 
-# 3. Connect to MongoDB Atlas
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+# 3. Connect to MongoDB Atlas (Graceful Fallback)
+predictions_collection = None
 MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI)
-db = client["sih_project"]
-predictions_collection = db["ml_results"]
+if MONGO_URI:
+    try:
+        from pymongo import MongoClient
+        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+        db = client["sih_project"]
+        predictions_collection = db["ml_results"]
+    except Exception as e:
+        print(f"MongoDB connection notice: {e}")
 
-# 4. Load Both .pkl Files
-MODEL_PATH = "saved_models/urban_heatwave_pipeline.pkl"
+# 4. Load Pipeline Model
+heatwave_pipeline = None
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CANDIDATE_PATHS = [
+    os.path.join(BASE_DIR, "saved_models", "urban_heatwave_pipeline.pkl"),
+    os.path.join(os.getcwd(), "saved_models", "urban_heatwave_pipeline.pkl"),
+    "saved_models/urban_heatwave_pipeline.pkl"
+]
 
-try:
-    heatwave_pipeline = joblib.load(MODEL_PATH)
-    print("Urban Heatwave Pipeline loaded successfully!")
-except Exception as e:
-    print(f"Failed to load pipeline model: {e}")
+for p in CANDIDATE_PATHS:
+    if os.path.exists(p):
+        try:
+            heatwave_pipeline = joblib.load(p)
+            print(f"Urban Heatwave Pipeline loaded successfully from {p}!")
+            break
+        except Exception as e:
+            print(f"Failed to load pipeline model from {p}: {e}")
 
 
 # 5. Define the Data Contract
@@ -179,6 +200,9 @@ class FrontendRequest(BaseModel):
 
 # 6. Helper function to fetch live satellite data from GEE
 def fetch_gee_data(lat: float, lon: float) -> float:
+    if not gee_available or ee is None:
+        return 0.0
+
     try:
         point = ee.Geometry.Point([lon, lat])
 
@@ -194,15 +218,15 @@ def fetch_gee_data(lat: float, lon: float) -> float:
             reducer=ee.Reducer.first(), geometry=point, scale=1000
         ).getInfo()
 
-        raw_lst = sample.get("LST_Day_1km")
+        raw_lst = sample.get("LST_Day_1km") if sample else None
         lst_celsius = (raw_lst * 0.02 - 273.15) if raw_lst is not None else 0.0
         return round(lst_celsius, 2)
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"GEE Fetch Error: {str(e)}")
+        print(f"GEE Fetch notice: {e}. Falling back to Open-Meteo temperature.")
+        return 0.0
 
 
-def fetch_live_weather(lat, lon):
+def fetch_live_weather(lat: float, lon: float) -> pd.DataFrame:
     """Fetches 72 hours of historical + current live weather for time-series features."""
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
@@ -236,11 +260,11 @@ def fetch_live_weather(lat, lon):
         df["date_time"] = pd.to_datetime(df["date_time"])
 
         # 2. Merge Daily Max/Min Temperatures
-        # FIX: Use .date directly on the DatetimeIndex object
         df["date"] = df["date_time"].dt.date
+        daily_dates = [pd.to_datetime(t).date() for t in data["daily"]["time"]]
         daily_df = pd.DataFrame(
             {
-                "date": pd.to_datetime(data["daily"]["time"]).date,
+                "date": daily_dates,
                 "maxtempC": data["daily"]["temperature_2m_max"],
                 "mintempC": data["daily"]["temperature_2m_min"],
             }
@@ -252,21 +276,24 @@ def fetch_live_weather(lat, lon):
         current_time = pd.Timestamp.now().floor("h")
         df = df[df["date_time"] <= current_time].tail(72).reset_index(drop=True)
 
+        if len(df) < 72:
+            raise ValueError(f"Insufficient weather records: {len(df)} rows")
+
         return df
 
     except Exception as e:
-        print(f"Open-Meteo API failed: {e}. Generating 72-hour safe fallback data.")
+        print(f"Open-Meteo API notice: {e}. Generating 72-hour safe fallback data.")
         dates = pd.date_range(end=pd.Timestamp.now().floor("h"), periods=72, freq="h")
         fallback_df = pd.DataFrame(
             {
                 "date_time": dates,
-                "tempC": 31.9,
-                "maxtempC": 35.0,
-                "mintempC": 26.0,
+                "tempC": 38.5,
+                "maxtempC": 42.0,
+                "mintempC": 28.0,
                 "DewPointC": 18.0,
                 "WindGustKmph": 15.0,
                 "cloudcover": 20,
-                "humidity": 45,
+                "humidity": 35,
                 "pressure": 1008,
                 "winddirDegree": 240,
                 "windspeedKmph": 12,
@@ -275,8 +302,27 @@ def fetch_live_weather(lat, lon):
         return fallback_df
 
 
+@app.get("/")
+@app.get("/health")
+def health_check():
+    return {
+        "status": "online",
+        "service": "SIH Heatwave ML API",
+        "model_loaded": heatwave_pipeline is not None,
+        "gee_available": gee_available,
+        "database_connected": predictions_collection is not None,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 @app.post("/api/predict")
 async def get_prediction(request: FrontendRequest):
+    if heatwave_pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Machine learning model is currently unavailable or failed to load.",
+        )
+
     # 1. Fetch exactly 72 hours of live weather data as a DataFrame
     input_df = fetch_live_weather(request.latitude, request.longitude)
 
@@ -314,7 +360,12 @@ async def get_prediction(request: FrontendRequest):
         "status": "Success",
     }
 
-    # 8. Save to MongoDB Atlas
-    predictions_collection.insert_one(prediction_result.copy())
+    # 8. Save to MongoDB Atlas if connected
+    if predictions_collection is not None:
+        try:
+            predictions_collection.insert_one(prediction_result.copy())
+        except Exception as e:
+            print(f"MongoDB write notice: {e}")
 
     return prediction_result
+
