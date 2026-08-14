@@ -1,33 +1,13 @@
-import os
-from pathlib import Path
-from typing import Annotated, Optional
-
+from typing import Annotated
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from datetime import datetime, timezone
-from dotenv import load_dotenv
+from datetime import datetime
 from pymongo import MongoClient
 import requests
 import ee
 import joblib
-
-from app.services.hvi_model import compute_hvi
-
-load_dotenv()
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "urban_heatwave")
-GEE_PROJECT_ID = os.getenv("GEE_PROJECT_ID", "heatwavemitigationsystem")
-OPEN_METEO_BASE_URL = os.getenv(
-    "OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1"
-).rstrip("/")
-CORS_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "*").split(",")
-    if origin.strip()
-]
+import pickle
 
 # 1. Initialize FastAPI
 app = FastAPI(
@@ -38,7 +18,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -148,39 +128,31 @@ import __main__
 __main__.TemporalFeatureEngineer = TemporalFeatureEngineer
 
 
-# 2. Initialize Google Earth Engine (optional — the service degrades to weather-only)
+# 2. Initialize Google Earth Engine
 try:
-    ee.Initialize(project=GEE_PROJECT_ID)
-    GEE_READY = True
+    ee.Initialize(project="heatwavemitigationsystem")
     print("Google Earth Engine initialized successfully!")
 except Exception as e:
-    GEE_READY = False
-    print(f"GEE Initialization failed, falling back to weather data only: {e}")
+    print(f"GEE Initialization failed! Error: {e}")
 
-# 3. Connect to MongoDB
+# 3. Connect to MongoDB Atlas
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
-db = client[MONGO_DB_NAME]
+db = client["sih_project"]
 predictions_collection = db["ml_results"]
-wards_collection = db["wards"]
-daily_risk_collection = db["dailyrisks"]
 
-# 4. Load the trained pipeline
-MODEL_PATH = BASE_DIR / "saved_models" / "urban_heatwave_pipeline.pkl"
+# 4. Load Both .pkl Files
+MODEL_PATH = "saved_models/urban_heatwave_pipeline.pkl"
 
 try:
     heatwave_pipeline = joblib.load(MODEL_PATH)
     print("Urban Heatwave Pipeline loaded successfully!")
 except Exception as e:
-    heatwave_pipeline = None
     print(f"Failed to load pipeline model: {e}")
-
-# Model classes mapped onto the riskTier enum the backend/dashboard use
-RISK_TIER_MAP = {0: "Low", 1: "Severe", 2: "Extreme"}
-PREDICTION_LABELS = {
-    0: "Low (No Heatwave)",
-    1: "Mild Heatwave",
-    2: "Extreme Heatwave",
-}
 
 
 # 5. Define the Data Contract
@@ -206,11 +178,7 @@ class FrontendRequest(BaseModel):
 
 
 # 6. Helper function to fetch live satellite data from GEE
-def fetch_gee_data(lat: float, lon: float) -> Optional[float]:
-    """Return the latest MODIS land surface temperature, or None when unavailable."""
-    if not GEE_READY:
-        return None
-
+def fetch_gee_data(lat: float, lon: float) -> float:
     try:
         point = ee.Geometry.Point([lon, lat])
 
@@ -227,19 +195,17 @@ def fetch_gee_data(lat: float, lon: float) -> Optional[float]:
         ).getInfo()
 
         raw_lst = sample.get("LST_Day_1km")
-        if raw_lst is None:
-            return None
-        return round(raw_lst * 0.02 - 273.15, 2)
+        lst_celsius = (raw_lst * 0.02 - 273.15) if raw_lst is not None else 0.0
+        return round(lst_celsius, 2)
 
     except Exception as e:
-        print(f"GEE fetch failed for ({lat}, {lon}), using weather temperature: {e}")
-        return None
+        raise HTTPException(status_code=500, detail=f"GEE Fetch Error: {str(e)}")
 
 
 def fetch_live_weather(lat, lon):
     """Fetches 72 hours of historical + current live weather for time-series features."""
     url = (
-        f"{OPEN_METEO_BASE_URL}/forecast?latitude={lat}&longitude={lon}"
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,cloud_cover,"
         f"surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
         f"&daily=temperature_2m_max,temperature_2m_min"
@@ -309,121 +275,46 @@ def fetch_live_weather(lat, lon):
         return fallback_df
 
 
-def run_prediction(lat: float, lon: float) -> dict:
-    """Run the pipeline on 72h of live weather, with the GEE temperature when available."""
-    if heatwave_pipeline is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Prediction model is not loaded. Check ai-service startup logs.",
-        )
+@app.post("/api/predict")
+async def get_prediction(request: FrontendRequest):
+    # 1. Fetch exactly 72 hours of live weather data as a DataFrame
+    input_df = fetch_live_weather(request.latitude, request.longitude)
 
-    input_df = fetch_live_weather(lat, lon)
+    # 2. Try to get Google Earth Engine satellite temp
+    gee_temp = fetch_gee_data(request.latitude, request.longitude)
 
-    # Inject the satellite temperature into the current hour when GEE is reachable
-    gee_temp = fetch_gee_data(lat, lon)
+    # 3. Inject GEE Temp into the CURRENT hour (the very last row) if it succeeded
     final_temp = (
-        gee_temp if gee_temp is not None else input_df.at[input_df.index[-1], "tempC"]
+        gee_temp if gee_temp != 0.0 else input_df.at[input_df.index[-1], "tempC"]
     )
     input_df.at[input_df.index[-1], "tempC"] = final_temp
 
+    # 4. Pass the entire 72-hour DataFrame to the pipeline!
     raw_predictions = heatwave_pipeline.predict(input_df)
+
+    # 5. Extract the raw integer prediction (0, 1, or 2) for the current live hour
     raw_class_integer = int(raw_predictions[-1])
 
-    return {
-        "latitude": lat,
-        "longitude": lon,
+    # 6. Map exactly according to your original np.select definition!
+    # 0 = Low (<40), 1 = Mild (40-45), 2 = Extreme (>=45)
+    custom_label_map = {
+        0: "Low (No Heatwave)",
+        1: "Mild Heatwave",
+        2: "Extreme Heatwave",
+    }
+
+    final_prediction = custom_label_map.get(raw_class_integer, "Unknown")
+
+    # 7. Construct final response payload
+    prediction_result = {
+        "latitude": request.latitude,
+        "longitude": request.longitude,
         "temperature_celsius": float(final_temp),
-        "humidity": float(input_df.at[input_df.index[-1], "humidity"]),
-        "prediction_class": raw_class_integer,
-        "prediction": PREDICTION_LABELS.get(raw_class_integer, "Unknown"),
-        "risk_tier": RISK_TIER_MAP.get(raw_class_integer, "Low"),
-        "gee_used": gee_temp is not None,
+        "prediction": final_prediction,
         "status": "Success",
     }
 
-
-def ward_centroid(ward: dict) -> Optional[tuple]:
-    """Average the outer ring of a ward's GeoJSON polygon into a (lat, lon) point."""
-    try:
-        ring = ward["boundary"]["coordinates"][0]
-    except (KeyError, IndexError, TypeError):
-        return None
-
-    points = [p for p in ring if isinstance(p, (list, tuple)) and len(p) >= 2]
-    if not points:
-        return None
-
-    lon = sum(p[0] for p in points) / len(points)
-    lat = sum(p[1] for p in points) / len(points)
-    return lat, lon
-
-
-@app.get("/health")
-async def health():
-    return {
-        "status": "ok",
-        "model_loaded": heatwave_pipeline is not None,
-        "gee_ready": GEE_READY,
-        "database": MONGO_DB_NAME,
-    }
-
-
-@app.post("/api/predict")
-async def get_prediction(request: FrontendRequest):
-    prediction_result = run_prediction(request.latitude, request.longitude)
+    # 8. Save to MongoDB Atlas
     predictions_collection.insert_one(prediction_result.copy())
+
     return prediction_result
-
-
-@app.post("/internal/recompute")
-async def recompute_daily_risk():
-    """Recompute today's risk for every ward and upsert it into the shared dailyrisks collection."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    updated, skipped = [], []
-
-    for ward in wards_collection.find({}):
-        centroid = ward_centroid(ward)
-        if centroid is None:
-            skipped.append({"wardId": ward.get("wardId"), "reason": "no boundary"})
-            continue
-
-        lat, lon = centroid
-        prediction = run_prediction(lat, lon)
-        hvi = compute_hvi(
-            {
-                "lst_temp": prediction["temperature_celsius"],
-                "pct_elderly": ward.get("pctElderly", 0),
-                "pct_outdoor_workers": ward.get("pctOutdoorWorkers", 0),
-                "green_cover_pct": ward.get("greenCoverPct", 0),
-            }
-        )
-
-        daily_risk_collection.update_one(
-            {"wardId": ward["wardId"], "date": today},
-            {
-                "$set": {
-                    "hvi": hvi,
-                    "riskTier": prediction["risk_tier"],
-                    "forecastTempC": prediction["temperature_celsius"],
-                    "forecastHumidity": prediction["humidity"],
-                    "computedAt": datetime.now(timezone.utc),
-                    "isSimulated": False,
-                }
-            },
-            upsert=True,
-        )
-        updated.append(
-            {
-                "wardId": ward["wardId"],
-                "riskTier": prediction["risk_tier"],
-                "hvi": hvi,
-            }
-        )
-
-    return {
-        "success": True,
-        "date": today,
-        "updated": updated,
-        "skipped": skipped,
-        "message": f"Recomputed risk for {len(updated)} ward(s)",
-    }

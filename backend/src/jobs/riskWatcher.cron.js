@@ -153,9 +153,6 @@ async function checkAndAlert() {
   }
 
 function startWatcher() {
-  if (DEMO_RECIPIENTS.length === 0) {
-    console.warn('Risk watcher: MY_PHONE_NUMBER is not set — alerts will not be dispatched');
-  }
   cron.schedule('*/30 * * * * *', checkAndAlert);
   console.log('Risk watcher started (checking every 30 seconds)');
 }

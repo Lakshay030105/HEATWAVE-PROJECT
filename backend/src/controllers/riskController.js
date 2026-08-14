@@ -19,7 +19,6 @@
 // ============================================================================
 
 const DailyRisk = require('../models/DailyRisk');
-const aiService = require('../services/aiService');
 
 // 1. Fetch the 30-day history for a specific ward (for the trend chart)
 exports.getRiskHistory = async (req, res, next) => {
@@ -66,22 +65,6 @@ exports.getLatestRisks = async (req, res, next) => {
   } catch (err) {
     console.error("Error fetching latest risks:", err);
     res.status(500).json({ success: false, message: "Server error fetching latest risks" });
-    if (next) next(err);
-  }
-};
-
-// 3. Ask the AI service to recompute today's risk for every ward
-exports.recomputeRisk = async (req, res, next) => {
-  try {
-    const result = await aiService.recomputeRisk();
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    const detail = err.response?.data?.detail || err.message;
-    console.error("Error recomputing risk via AI service:", detail);
-    res.status(502).json({
-      success: false,
-      message: `AI service recompute failed: ${detail}`
-    });
     if (next) next(err);
   }
 };
