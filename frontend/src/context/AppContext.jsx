@@ -9,7 +9,7 @@ const AppContext = createContext();
 
 export function AppProvider({ children }) {
   const [rawWards, setRawWards] = useState([]);
-  const [selectedWardId, setSelectedWardId] = useState('JAI-W01');
+  const [selectedWardId, setSelectedWardId] = useState('');
   const [latestRisks, setLatestRisks] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [resources, setResources] = useState([]);
@@ -92,8 +92,34 @@ export function AppProvider({ children }) {
   // Compute active wards with simulation state AND predictive timeline hours applied
   const wards = useMemo(() => {
     return rawWards.map(w => {
-      // Calculate simulated temp curve based on prediction timeline hours
-      const tempDelta = predictionHours === 0 ? 0 :
+      // If in standard live mode (predictionHours === 0), use the true live AI model / DB risk
+      if (predictionHours === 0) {
+        let latestRisk = w.latestRisk || {
+          riskTier: 'Moderate',
+          hvi: 50,
+          forecastTempC: 40,
+          forecastHumidity: 30
+        };
+
+        // If manual simulation override is active for this ward, override with simulation state
+        if (simulationActive && w.wardId === simulationActive.wardId) {
+          latestRisk = {
+            ...latestRisk,
+            riskTier: simulationActive.tier,
+            forecastTempC: simulationActive.tier === 'Extreme' ? 48 : simulationActive.tier === 'Severe' ? 45 : 42,
+            hvi: simulationActive.tier === 'Extreme' ? 95 : 82,
+            isSimulated: true
+          };
+        }
+
+        return {
+          ...w,
+          latestRisk
+        };
+      }
+
+      // If time-travel forecasting slider is actively used:
+      const tempDelta =
         predictionHours === 3 ? 1.5 :
         predictionHours === 6 ? 3.0 :
         predictionHours === 12 ? -2.0 :
@@ -102,10 +128,8 @@ export function AppProvider({ children }) {
       const baseTemp = w.latestRisk?.forecastTempC || 40;
       const forecastTemp = Math.round(baseTemp + tempDelta);
 
-      // Recompute HVI formula based on ML model:
-      // HVI = 0.35 * LST_norm + 0.25 * Elderly_norm + 0.25 * Outdoor_norm + 0.15 * (1-Green)
       const lstNorm = Math.min(100, Math.max(0, ((forecastTemp - 30) / 20) * 100));
-      const elderlyNorm = (w.pctElderly || 0.1) * 100 * 4; // scaled
+      const elderlyNorm = (w.pctElderly || 0.1) * 100 * 4;
       const outdoorNorm = (w.pctOutdoorWorkers || 0.2) * 100 * 2;
       const greenInvertNorm = (1 - (w.greenCoverPct || 0.1)) * 100;
       
@@ -113,7 +137,6 @@ export function AppProvider({ children }) {
         0.35 * lstNorm + 0.25 * elderlyNorm + 0.25 * outdoorNorm + 0.15 * greenInvertNorm
       ));
 
-      // Recompute combined risk tier: 0.6 * HVI + 0.4 * Forecast_Severity
       let forecastSeverity = 0;
       if (forecastTemp > 45) forecastSeverity = 100;
       else if (forecastTemp > 42) forecastSeverity = 75;
@@ -134,7 +157,6 @@ export function AppProvider({ children }) {
         combinedScore
       };
 
-      // Check if manual simulation override is active for this ward
       if (simulationActive && w.wardId === simulationActive.wardId) {
         latestRisk = {
           ...latestRisk,

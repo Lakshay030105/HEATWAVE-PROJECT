@@ -47,7 +47,21 @@
 require('dotenv').config();
 const twilio = require('twilio');
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+let client = null;
+const sid = process.env.TWILIO_ACCOUNT_SID || process.env.TWILIO_API_KEY_SID;
+const token = process.env.TWILIO_AUTH_TOKEN || process.env.TWILIO_API_KEY_SECRET;
+
+if (sid && token) {
+  try {
+    if (sid.startsWith('SK') && process.env.TWILIO_MAIN_ACCOUNT_SID) {
+      client = twilio(sid, token, { accountSid: process.env.TWILIO_MAIN_ACCOUNT_SID });
+    } else {
+      client = twilio(sid, token);
+    }
+  } catch (err) {
+    console.warn("⚠️ Twilio initialization notice:", err.message);
+  }
+}
 
 // Trial accounts must use predefined template names as `body` (not custom text).
 // See: https://www.twilio.com/docs/usage/trials/try-out-sms
@@ -64,6 +78,11 @@ exports.sendSMS = async (phoneNumber, wardName, riskTier, advisory) => {
 
     const customBody = `HEAT ALERT: ${wardName} is at ${riskTier} risk. ${advisory}. Stay hydrated, seek shade.`;
     const trialBody = process.env.TWILIO_SMS_TEMPLATE || TRIAL_SMS_TEMPLATES[riskTier] || 'sms_internal_alerts';
+
+    if (!client) {
+      console.log(`[MOCK TWILIO SMS] -> To: ${phoneNumber} | Ward: ${wardName} | Tier: ${riskTier} | Advisory: ${advisory}`);
+      return { success: true, sid: `mock_sms_${Date.now()}` };
+    }
 
     const message = await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,

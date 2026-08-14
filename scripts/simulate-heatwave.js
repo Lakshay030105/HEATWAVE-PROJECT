@@ -1,43 +1,54 @@
-// ============================================================================
-// simulate-heatwave.js — CLI Simulation Fallback
-// Owner: Member 5 (Integration/QA Lead)
-// When to build: Day 3
-// Usage: node scripts/simulate-heatwave.js --wardId AHM-W03 --tier Extreme
-// ============================================================================
-//
-// PURPOSE:
-//   Command-line fallback for the Simulation Toggle. If the UI button breaks
-//   during the live demo, Member 5 can run this from the terminal to trigger
-//   the same effect.
-//
-// WHAT TO BUILD:
-//
-//   1. PARSE CLI ARGUMENTS:
-//      - --wardId (required): the ward to simulate
-//      - --tier (optional, default: "Extreme"): the risk tier to set
-//      - Use process.argv or a simple arg parser
-//
-//   2. OPTION A — Call the Express API:
-//      - POST http://localhost:5000/api/simulate
-//      - Body: { wardId, tier }
-//      - Use axios or the built-in fetch (Node 18+)
-//      - Log: "✅ Simulation triggered: {wardId} → {tier}"
-//
-//   3. OPTION B — Write directly to MongoDB:
-//      - Connect to MongoDB using MONGO_URI
-//      - Upsert a DailyRisk document (same shape as simulateController)
-//      - This bypasses Express entirely (useful if Express is down)
-//      - Log: "✅ DailyRisk written directly: {wardId} → {tier}"
-//
-//   Recommendation: Build both options. Try Option A first, fall back to B.
-//
-// EXAMPLE USAGE:
-//   node scripts/simulate-heatwave.js --wardId AHM-W03 --tier Extreme
-//   node scripts/simulate-heatwave.js --wardId AHM-W03 --tier Low    (to reset)
-//
-// DEPENDENCIES:
-//   - axios or node-fetch (for Option A)
-//   - mongoose or mongodb (for Option B)
-//   - dotenv
-//
-// ============================================================================
+const path = require('path');
+const backendModules = path.join(__dirname, '../backend/node_modules');
+const dotenv = require(path.join(backendModules, 'dotenv'));
+dotenv.config({ path: path.join(__dirname, '../backend/.env') });
+
+const args = process.argv.slice(2);
+let wardId = "JPR-W02";
+let tier = "Extreme";
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--wardId' && args[i + 1]) {
+    wardId = args[i + 1];
+  } else if (args[i] === '--tier' && args[i + 1]) {
+    tier = args[i + 1];
+  }
+}
+
+async function simulate() {
+  console.log(`Triggering Simulation: Ward=${wardId}, Tier=${tier}...`);
+  try {
+    const res = await fetch('http://localhost:5000/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wardId, tier })
+    });
+    const data = await res.json();
+    if (data.success) {
+      console.log(`✅ Simulation triggered via Express API: ${wardId} → ${tier}`);
+      console.log(`📡 Risk watcher will dispatch alerts on its next cycle (~30s).`);
+      return;
+    }
+    throw new Error(data.message || 'API error');
+  } catch (apiErr) {
+    console.warn(`Express API notice (${apiErr.message}). Writing directly to MongoDB...`);
+    try {
+      const mongoose = require(path.join(backendModules, 'mongoose'));
+      const DailyRisk = require('../backend/src/models/DailyRisk');
+      const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/urban_heatwave";
+      await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
+      const todayStr = new Date().toISOString().split('T')[0];
+      await DailyRisk.findOneAndUpdate(
+        { wardId, date: todayStr },
+        { $set: { riskTier: tier, hvi: 95, isSimulated: true, forecastTempC: 46, forecastHumidity: 20 } },
+        { upsert: true, new: true }
+      );
+      console.log(`✅ DailyRisk written directly to MongoDB: ${wardId} → ${tier}`);
+      await mongoose.disconnect();
+    } catch (dbErr) {
+      console.error(`❌ Failed to simulate:`, dbErr.message);
+    }
+  }
+}
+
+simulate();

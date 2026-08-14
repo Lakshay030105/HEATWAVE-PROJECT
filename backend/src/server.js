@@ -109,30 +109,20 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("Local MongoDB Connected successfully");
+const startServer = async () => {
+  try {
+    if (process.env.MONGO_URI) {
+      await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 3000 });
+      console.log("✅ MongoDB Connected successfully");
+      startWatcher();
+    } else {
+      console.warn("⚠️ MONGO_URI not provided; running in offline mode.");
+    }
+  } catch (err) {
+    console.error("⚠️ MongoDB Connection Warning:", err.message);
+  }
 
-    // TEMPORARY DUMMY DATA SCRIPT (already inserted — keep commented)
-    // const checkWard = await Ward.findOne({ wardId: "W-01" });
-    // if (!checkWard) {
-    //   await Ward.create({
-    //     wardId: "W-01",
-    //     name: "Central Ward",
-    //     cityId: "city-01",
-    //     population: 15000,
-    //     pctElderly: 0.15,
-    //     pctOutdoorWorkers: 0.30,
-    //     greenCoverPct: 0.10,
-    //     boundary: {
-    //       type: "Polygon",
-    //       coordinates: [[[77.2, 28.6], [77.3, 28.6], [77.3, 28.7], [77.2, 28.7], [77.2, 28.6]]]
-    //     }
-    //   });
-    //   console.log("Dummy Ward inserted!");
-    // }
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+};
 
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-    startWatcher();
-  })
-  .catch((err) => console.error("MongoDB Connection Error:", err));
+startServer();

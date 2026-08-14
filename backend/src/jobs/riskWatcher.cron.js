@@ -82,8 +82,12 @@ const Ward = require('../models/Ward');
 const twilioService = require('../services/twilioService');
 // const firebaseService = require('../services/firebaseService'); // Uncomment if Firebase push notifications are enabled
 
-// Demo recipient phone numbers (verified Twilio trial numbers from .env)
-const DEMO_RECIPIENTS = [process.env.MY_PHONE_NUMBER].filter(Boolean);
+// Demo recipient phone numbers (verified Twilio trial numbers from .env or fallback for local demo)
+const DEMO_RECIPIENTS = [
+  process.env.MY_PHONE_NUMBER,
+  process.env.DEMO_RECIPIENT,
+  '+917082744636'
+].filter(Boolean);
 
 // Advisory text mappings based on risk tier
 const ADVISORY_MESSAGES = {

@@ -17,7 +17,7 @@ function EmergencyPage() {
   const { showToast } = useToast();
 
   const [selectedUnit, setSelectedUnit] = useState(null);
-  const [targetWardId, setTargetWardId] = useState('JAI-W01');
+  const [targetWardId, setTargetWardId] = useState(wards[0]?.wardId || 'JPR-W01');
 
   const availableCount = emergencyUnits.filter(u => u.status === 'available').length;
   const dispatchedCount = emergencyUnits.filter(u => u.status === 'dispatched').length;
@@ -204,9 +204,9 @@ function EmergencyPage() {
 
         <div className="space-y-3">
           {[
-            { id: 't-1', name: 'Rameshwar Ji (68y)', phone: '+91 98290 33412', ward: 'JAI-W01', symptoms: 'Unconscious, core temp > 40.5°C, cessation of sweating (Heat Stroke)', level: 'Priority 1 (Red)', time: '4 mins ago' },
-            { id: 't-2', name: 'Sunita Devi (45y)', phone: '+91 94140 55678', ward: 'JAI-W05', symptoms: 'Severe dizziness, vomiting, intense muscle cramps at construction site', level: 'Priority 2 (Orange)', time: '12 mins ago' },
-            { id: 't-3', name: 'Abdul Karim (52y)', phone: '+91 97850 99876', ward: 'JAI-W08', symptoms: 'Dehydration, headache, low blood pressure', level: 'Priority 3 (Yellow)', time: '28 mins ago' }
+            { id: 't-1', name: 'Rameshwar Ji (68y)', phone: '+91 98290 33412', ward: 'JPR-W01', symptoms: 'Unconscious, core temp > 40.5°C, cessation of sweating (Heat Stroke)', level: 'Priority 1 (Red)', time: '4 mins ago' },
+            { id: 't-2', name: 'Sunita Devi (45y)', phone: '+91 94140 55678', ward: 'JPR-W05', symptoms: 'Severe dizziness, vomiting, intense muscle cramps at construction site', level: 'Priority 2 (Orange)', time: '12 mins ago' },
+            { id: 't-3', name: 'Abdul Karim (52y)', phone: '+91 97850 99876', ward: 'JPR-W02', symptoms: 'Dehydration, headache, low blood pressure', level: 'Priority 3 (Yellow)', time: '28 mins ago' }
           ].map(call => (
             <div key={call.id} className="p-4 rounded-xl bg-black/30 border border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
