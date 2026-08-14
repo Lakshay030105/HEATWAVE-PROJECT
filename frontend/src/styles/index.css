@@ -1,54 +1,105 @@
+@import "tailwindcss";
+@import 'leaflet/dist/leaflet.css';
+
 /* ============================================================================
-   index.css — Global Styles & Design System
-   Owner: Member 4 (Frontend/UX Developer)
-   When to build: Day 1-2 (foundation), Day 4 (polish)
-   ============================================================================
-
-   PURPOSE:
-     Define the visual design system used throughout the app. All components
-     should reference these CSS variables for consistency.
-
-   WHAT TO BUILD:
-
-   1. CSS VARIABLES (put in :root):
-      --color-risk-low:      #22c55e;    (green)
-      --color-risk-moderate:  #f59e0b;    (amber)
-      --color-risk-severe:    #f97316;    (orange)
-      --color-risk-extreme:   #ef4444;    (red)
-
-      --color-bg-primary:     #0f172a;    (dark navy — dashboard background)
-      --color-bg-secondary:   #1e293b;    (slightly lighter — card backgrounds)
-      --color-bg-citizen:     #ffffff;    (white — citizen page background)
-      --color-text-primary:   #f1f5f9;    (light gray — on dark backgrounds)
-      --color-text-secondary: #94a3b8;    (muted — labels, captions)
-      --color-accent:         #3b82f6;    (blue — links, buttons)
-
-      --font-primary: 'Inter', sans-serif;   (import from Google Fonts)
-      --border-radius: 12px;
-      --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-
-   2. GLOBAL RESET:
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: var(--font-primary); }
-
-   3. UTILITY CLASSES:
-      .risk-badge-low      { background: var(--color-risk-low); }
-      .risk-badge-moderate { background: var(--color-risk-moderate); }
-      .risk-badge-severe   { background: var(--color-risk-severe); }
-      .risk-badge-extreme  { background: var(--color-risk-extreme); }
-
-   4. LEAFLET CSS IMPORT:
-      Don't forget to import Leaflet's CSS (either here or in HeatMap.jsx):
-      @import 'leaflet/dist/leaflet.css';
-
-   5. GOOGLE FONT IMPORT:
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-   DESIGN PHILOSOPHY:
-     - Authority dashboard: dark theme (makes map colors pop, looks professional)
-     - Citizen page: light theme (accessible, familiar, easy to read)
-     - Use the risk tier colors CONSISTENTLY everywhere (map, badges, charts)
-     - Smooth transitions on hover/state changes (0.2s ease)
-     - Cards with subtle shadows and rounded corners
-
+   Global Design System & Font Fix — Jaipur Heatwave EWS
    ============================================================================ */
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-bg: #0B0E14;
+  --color-panel: rgba(255, 255, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-safe: #2DD4BF;
+  --color-moderate: #FBBF24;
+  --color-severe: #FB7A3C;
+  --color-extreme: #EF4444;
+}
+
+/* Global Typography Override to ensure Inter font everywhere */
+html, body, #root, button, input, select, textarea, div, span, h1, h2, h3, h4, h5, h6, p, label {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Hide All Scrollbars Globally for a ultra-clean professional presentation */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html, body, #root, * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+body {
+  background-color: #0B0E14;
+  color: #f1f5f9;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular Numerals for data */
+.tabular-data {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Glassmorphism Card System */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Form Controls (Uniform heights, borders, and fonts across all forms) */
+.app-input, .app-select {
+  width: 100%;
+  height: 2.75rem; /* 44px uniform height */
+  padding: 0 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  transition: all 0.2s ease;
+}
+.app-input:focus, .app-select:focus {
+  outline: none;
+  border-color: #2DD4BF;
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+}
+
+/* Leaflet Container Overrides */
+.leaflet-container {
+  background: #0B0E14 !important;
+  border-radius: 1rem;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+.leaflet-popup-content-wrapper {
+  background: #0B0E14 !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem !important;
+  backdrop-filter: blur(8px);
+}
+.leaflet-popup-tip {
+  background: #0B0E14 !important;
+}
+.leaflet-control-zoom a {
+  background: #0B0E14 !important;
+  color: #94a3b8 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
