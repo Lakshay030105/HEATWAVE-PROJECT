@@ -19,8 +19,8 @@ exports.getFeedback = async (req, res, next) => {
     res.status(200).json({ success: true, data: reports });
   } catch (err) {
     console.error('Error fetching feedback:', err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: 'Server error fetching feedback' });
-    if (next) next(err);
   }
 };
 
@@ -77,8 +77,8 @@ exports.submitFeedback = async (req, res, next) => {
     res.status(201).json({ success: true, id: feedback._id });
   } catch (err) {
     console.error('Error submitting feedback:', err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: 'Server error submitting feedback' });
-    if (next) next(err);
   }
 };
 
@@ -100,8 +100,8 @@ exports.updateFeedback = async (req, res, next) => {
     res.status(200).json({ success: true, data: updated });
   } catch (err) {
     console.error('Error updating feedback:', err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: 'Server error updating feedback' });
-    if (next) next(err);
   }
 };
 

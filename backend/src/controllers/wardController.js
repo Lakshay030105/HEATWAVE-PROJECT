@@ -23,8 +23,8 @@ exports.getAllWards = async (req, res, next) => {
     res.status(200).json({ success: true, data: combinedWards });
   } catch (err) {
     console.error("Error fetching all wards:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error fetching wards data" });
-    next(err); // Passes the error to the custom middleware as requested
   }
 };
 
@@ -51,7 +51,7 @@ exports.getWardById = async (req, res, next) => {
     res.status(200).json({ success: true, data: combinedWard });
   } catch (err) {
     console.error("Error fetching single ward:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error fetching single ward" });
-    next(err);
   }
 };

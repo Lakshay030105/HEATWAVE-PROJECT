@@ -51,11 +51,13 @@ async function checkAndAlert() {
           }
   
           // Send SMS via Twilio
+          const alertMessage = `[AAROGYA HEAT ALERT] ⚠️ ${ward.name}: ${risk.riskTier} Risk! ${advisory}`;
           const smsResult = await twilioService.sendSMS(
             recipientPhone,
             ward.name,
             risk.riskTier,
-            advisory
+            advisory,
+            alertMessage
           );
 
           if (!smsResult.success) {
@@ -68,6 +70,7 @@ async function checkAndAlert() {
             wardId: risk.wardId,
             tier: risk.riskTier,
             channel: 'sms',
+            message: alertMessage,
             recipientPhone: recipientPhone,
             sentAt: new Date(),
             dedupeKey: dedupeKey,

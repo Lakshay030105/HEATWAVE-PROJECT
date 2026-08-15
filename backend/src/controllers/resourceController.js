@@ -21,8 +21,8 @@ exports.getResources = async (req, res, next) => {
     res.status(200).json({ success: true, data: resources });
   } catch (err) {
     console.error("Error fetching resources:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error fetching resources" });
-    if (next) next(err);
   }
 };
 
@@ -57,7 +57,7 @@ exports.updateResource = async (req, res, next) => {
     res.status(200).json({ success: true, data: updatedResource });
   } catch (err) {
     console.error("Error updating resource:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error updating resource" });
-    if (next) next(err);
   }
 };
