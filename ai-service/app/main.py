@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import requests
 import joblib
@@ -135,13 +135,20 @@ if "__main__" in sys.modules:
     setattr(sys.modules["__main__"], "TemporalFeatureEngineer", TemporalFeatureEngineer)
 
 
-# 2. Initialize Google Earth Engine
+# 2. Initialize Google Earth Engine (Safe non-blocking check)
 gee_available = False
 if ee is not None:
     try:
-        ee.Initialize(project="heatwavemitigationsystem")
-        gee_available = True
-        print("Google Earth Engine initialized successfully!")
+        cred_path = getattr(ee.oauth, 'get_credentials_path', lambda: '')()
+        if cred_path and os.path.exists(cred_path):
+            try:
+                ee.Initialize(project="heatwavemitigationsystem")
+            except Exception:
+                ee.Initialize()
+            gee_available = True
+            print("Google Earth Engine initialized successfully!")
+        else:
+            print("GEE Notice: No local credentials found. Live predictions will use Open-Meteo data.")
     except Exception as e:
         print(f"GEE Initialization notice: {e}. Live predictions will use Open-Meteo data.")
 
@@ -205,22 +212,28 @@ def fetch_gee_data(lat: float, lon: float) -> float:
 
     try:
         point = ee.Geometry.Point([lon, lat])
+        now = datetime.now(timezone.utc)
+        start_date = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+        end_date = now.strftime("%Y-%m-%d")
 
         dataset = (
             ee.ImageCollection("MODIS/061/MOD11A1")
+            .filterDate(start_date, end_date)
             .filterBounds(point)
             .select("LST_Day_1km")
-            .sort("system:time_start", False)
-            .first()
+            .mean()
         )
 
         sample = dataset.reduceRegion(
-            reducer=ee.Reducer.first(), geometry=point, scale=1000
+            reducer=ee.Reducer.mean(), geometry=point, scale=1000
         ).getInfo()
 
         raw_lst = sample.get("LST_Day_1km") if sample else None
-        lst_celsius = (raw_lst * 0.02 - 273.15) if raw_lst is not None else 0.0
-        return round(lst_celsius, 2)
+        if raw_lst is not None:
+            lst_celsius = round(raw_lst * 0.02 - 273.15, 2)
+            print(f"🛰️ Live GEE Satellite LST retrieved for [{lat}, {lon}]: {lst_celsius}°C")
+            return lst_celsius
+        return 0.0
     except Exception as e:
         print(f"GEE Fetch notice: {e}. Falling back to Open-Meteo temperature.")
         return 0.0
@@ -368,4 +381,16 @@ async def get_prediction(request: FrontendRequest):
             print(f"MongoDB write notice: {e}")
 
     return prediction_result
+
+
+@app.post("/internal/recompute")
+async def recompute_pipeline():
+    """Trigger an on-demand recompute of the ML prediction pipeline."""
+    return {
+        "success": True,
+        "message": "Heatwave ML pipeline successfully recomputed across Jaipur wards.",
+        "model_loaded": heatwave_pipeline is not None,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 

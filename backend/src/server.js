@@ -1,5 +1,5 @@
 const dns = require('dns');
-try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (_) {}
+try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (_) { }
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
@@ -56,14 +56,14 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/urban_heat
 const startServer = async () => {
   try {
     await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 });
-    console.log("✅ MongoDB Connected successfully");
+    console.log("MongoDB Connected successfully");
     startWatcher();
   } catch (err) {
-    console.error("⚠️ MongoDB Connection Error:", err.message);
+    console.error("MongoDB Connection Error:", err.message);
   }
 
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 };
 

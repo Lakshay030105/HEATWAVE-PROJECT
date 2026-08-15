@@ -17,7 +17,7 @@ function EmergencyPage() {
   const { showToast } = useToast();
 
   const [selectedUnit, setSelectedUnit] = useState(null);
-  const [targetWardId, setTargetWardId] = useState(wards[0]?.wardId || 'JPR-W01');
+  const [targetWardId, setTargetWardId] = useState(wards[0]?.wardId || 'JAI-W01');
 
   const availableCount = emergencyUnits.filter(u => u.status === 'available').length;
   const dispatchedCount = emergencyUnits.filter(u => u.status === 'dispatched').length;

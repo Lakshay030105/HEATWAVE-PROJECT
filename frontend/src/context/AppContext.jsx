@@ -22,6 +22,9 @@ export function AppProvider({ children }) {
   const [dataStreamMode, setDataStreamMode] = useState('demo'); // 'live' | 'demo'
   const [liveWeatherMap, setLiveWeatherMap] = useState({});
 
+  const rawWardsRef = React.useRef([]);
+  rawWardsRef.current = rawWards;
+
   const fetchLatestRisks = useCallback(async () => {
     try {
       const res = await getLatestRisks();
@@ -67,9 +70,9 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  const fetchLiveWeatherForAll = useCallback(async (wardsList = rawWards) => {
+  const fetchLiveWeatherForAll = useCallback(async (wardsList) => {
     try {
-      const targets = (wardsList && wardsList.length > 0) ? wardsList : rawWards;
+      const targets = (wardsList && wardsList.length > 0) ? wardsList : rawWardsRef.current;
       if (!targets || targets.length === 0) return;
 
       const weatherMap = {};
@@ -142,7 +145,7 @@ export function AppProvider({ children }) {
     } catch (e) {
       console.warn('Live weather background ingestion notice:', e);
     }
-  }, [rawWards]);
+  }, []);
 
   const fetchWards = useCallback(async () => {
     try {
@@ -158,16 +161,29 @@ export function AppProvider({ children }) {
   }, [fetchLiveWeatherForAll]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([
-      fetchWards(),
-      fetchLatestRisks(),
-      fetchAlerts(),
-      fetchResources(),
-      fetchReports(),
-      fetchEmergencyUnits(),
-      fetchLiveWeatherForAll()
-    ]);
-  }, [fetchWards, fetchLatestRisks, fetchAlerts, fetchResources, fetchReports, fetchEmergencyUnits, fetchLiveWeatherForAll]);
+    try {
+      const [wRes, rRes, aRes, resRes, repRes, euRes] = await Promise.all([
+        getWards(),
+        getLatestRisks(),
+        getAlerts(),
+        getResources(),
+        getReports(),
+        getEmergencyUnits()
+      ]);
+      const loadedWards = wRes.data || [];
+      setRawWards(loadedWards);
+      setLatestRisks(rRes.data || []);
+      setAlerts(aRes.data || []);
+      setResources(resRes.data || []);
+      setReports(repRes.data || []);
+      setEmergencyUnits(euRes.data || []);
+      if (loadedWards.length > 0) {
+        fetchLiveWeatherForAll(loadedWards);
+      }
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+    }
+  }, [fetchLiveWeatherForAll]);
 
   const selectWard = useCallback((wardId) => {
     setSelectedWardId(wardId);
@@ -328,20 +344,22 @@ export function AppProvider({ children }) {
 
   // Initial load
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
       setLoading(true);
       await refreshAll();
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
     init();
+    return () => { isMounted = false; };
   }, [refreshAll]);
 
   // Auto-fetch live weather when switching to 'live' mode
   useEffect(() => {
-    if (dataStreamMode === 'live' && rawWards.length > 0) {
-      fetchLiveWeatherForAll(rawWards);
+    if (dataStreamMode === 'live') {
+      fetchLiveWeatherForAll();
     }
-  }, [dataStreamMode, rawWards, fetchLiveWeatherForAll]);
+  }, [dataStreamMode, fetchLiveWeatherForAll]);
 
   // Auto-select first ward by default
   useEffect(() => {

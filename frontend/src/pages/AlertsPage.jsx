@@ -40,9 +40,11 @@ function AlertsPage() {
   const [selectedTier, setSelectedTier] = useState('Extreme');
   const [selectedChannel, setSelectedChannel] = useState('sms');
   const [selectedLang, setSelectedLang] = useState('hi');
+  const [recipientPhone, setRecipientPhone] = useState('+918607405507');
   const [customMessage, setCustomMessage] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
+  const [isSending, setIsSending] = useState(false);
 
   // Dynamic message template preview
   const wardObj = wards.find(w => w.wardId === selectedWardId);
@@ -60,20 +62,33 @@ function AlertsPage() {
 
   const handleSendBroadcast = async (e) => {
     e.preventDefault();
+    setIsSending(true);
+
     const alertData = {
       wardId: selectedWardId === 'ALL_CRITICAL' ? 'JAI-CRITICAL-ALL' : selectedWardId,
       tier: selectedTier,
       channel: selectedChannel,
       message: previewMessage,
       recipientCount: estimatedReach,
+      recipientPhone: recipientPhone.trim() || undefined,
       status: 'sent',
       sentAt: new Date().toISOString()
     };
 
-    await dispatchAlert(alertData);
-    showToast(`Broadcast sent to ${estimatedReach.toLocaleString()} citizens via ${selectedChannel.toUpperCase()}`, 'success');
-    setIsModalOpen(false);
-    setCustomMessage('');
+    try {
+      const result = await dispatchAlert(alertData);
+      if (result?.status === 'failed') {
+        showToast(`Broadcast recorded, but Twilio gateway flagged delivery notice for ${recipientPhone}`, 'error');
+      } else {
+        showToast(`Broadcast sent to ${estimatedReach.toLocaleString()} citizens via ${selectedChannel.toUpperCase()}`, 'success');
+      }
+      setIsModalOpen(false);
+      setCustomMessage('');
+    } catch (err) {
+      showToast('Error dispatching alert broadcast', 'error');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const filteredAlerts = alerts.filter(a => {
@@ -164,7 +179,7 @@ function AlertsPage() {
             <h2 className="text-base font-bold text-white">Automated Risk Watchdog Engine (Cron Active)</h2>
           </div>
           <span className="text-xs px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono font-bold">
-            ● 15m Heartbeat
+            ● 30s Heartbeat
           </span>
         </div>
 
@@ -175,9 +190,9 @@ function AlertsPage() {
                 <span className="font-bold text-red-400 uppercase tracking-wider">Rule #1: Extreme Heat Flash</span>
                 <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">SMS + Voice</span>
               </div>
-              <p className="text-gray-400 mt-1">If Forecast Temp &gt; 45°C OR HVI &gt; 80 in any ward, auto-trigger mass SMS to all registered outdoor workers.</p>
+              <p className="text-gray-400 mt-1">If Forecast Temp &gt; 45°C OR HVI &gt; 80 in any ward, auto-trigger mass SMS to registered verified numbers.</p>
             </div>
-            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe key: ward-date-extreme</div>
+            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe: ward-date-extreme-phone</div>
           </div>
 
           <div className="p-4 rounded-xl bg-black/30 border border-orange-500/20 flex flex-col justify-between">
@@ -188,7 +203,7 @@ function AlertsPage() {
               </div>
               <p className="text-gray-400 mt-1">If HVI &gt; 65 and elderly demographic &gt; 12%, dispatch community health worker alerts & cooling shelter notifications.</p>
             </div>
-            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe key: ward-date-severe</div>
+            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe: ward-date-severe-phone</div>
           </div>
 
           <div className="p-4 rounded-xl bg-black/30 border border-teal-500/20 flex flex-col justify-between">
@@ -199,7 +214,7 @@ function AlertsPage() {
               </div>
               <p className="text-gray-400 mt-1">When ambient temperature drops below 36°C after 6:00 PM, send evening recovery & hydration advisory.</p>
             </div>
-            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe key: ward-date-allclear</div>
+            <div className="mt-3 text-[11px] text-gray-500 font-mono">Dedupe: ward-date-allclear-phone</div>
           </div>
         </div>
       </div>
@@ -211,7 +226,7 @@ function AlertsPage() {
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Bell className="w-5 h-5 text-teal-400" /> Dispatched Alerts History
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Auditable broadcast log with recipient counts and delivery telemetry</p>
+            <p className="text-xs text-gray-400 mt-0.5">Auditable broadcast log with recipient counts, target phone numbers, and delivery telemetry</p>
           </div>
 
           {/* Search and Filters */}
@@ -265,12 +280,15 @@ function AlertsPage() {
                 filteredAlerts.map((alert, idx) => {
                   const wardNameDisplay = wards.find(w => w.wardId === alert.wardId)?.name || alert.wardId;
                   const tierColor = TIER_COLORS[alert.tier] || '#2DD4BF';
+                  const isFailed = alert.status === 'failed';
 
                   return (
                     <tr key={alert._id || idx} className="hover:bg-white/[0.02] transition-colors">
                       <td className="py-3.5 px-4 font-bold text-white">
                         <div>{wardNameDisplay}</div>
-                        <div className="text-[10px] text-gray-500 font-mono">{alert.wardId}</div>
+                        <div className="text-[10px] text-gray-500 font-mono">
+                          {alert.wardId} {alert.recipientPhone && `• ${alert.recipientPhone}`}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <span
@@ -287,6 +305,7 @@ function AlertsPage() {
                       <td className="py-3.5 px-4 uppercase text-gray-300 font-mono font-bold">
                         <div className="flex items-center gap-1.5">
                           {alert.channel === 'sms' && <Smartphone className="w-3.5 h-3.5 text-blue-400" />}
+                          {alert.channel === 'whatsapp' && <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />}
                           {alert.channel === 'voice' && <PhoneCall className="w-3.5 h-3.5 text-green-400" />}
                           {alert.channel === 'push' && <Radio className="w-3.5 h-3.5 text-purple-400" />}
                           <span>{alert.channel}</span>
@@ -303,9 +322,15 @@ function AlertsPage() {
                         <div className="text-[9px] text-gray-500">{new Date(alert.sentAt).toLocaleDateString()}</div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="flex items-center gap-1 text-teal-400 text-[11px] font-bold">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Sent
-                        </span>
+                        {isFailed ? (
+                          <span className="flex items-center gap-1 text-red-400 text-[11px] font-bold">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Failed
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-teal-400 text-[11px] font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Sent
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -377,17 +402,18 @@ function AlertsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-400 font-bold uppercase tracking-wider mb-1.5 text-[10px]">Broadcast Channel</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {[
                       { id: 'sms', label: 'SMS' },
-                      { id: 'voice', label: 'Voice IVR' },
-                      { id: 'push', label: 'Push App' }
+                      { id: 'whatsapp', label: 'WhatsApp' },
+                      { id: 'voice', label: 'Voice' },
+                      { id: 'push', label: 'Push' }
                     ].map(ch => (
                       <button
                         type="button"
                         key={ch.id}
                         onClick={() => setSelectedChannel(ch.id)}
-                        className={`p-2 rounded-lg font-bold text-center border transition-all
+                        className={`p-2 rounded-lg font-bold text-center border transition-all text-[11px]
                           ${selectedChannel === ch.id
                             ? 'bg-teal-500/20 text-teal-300 border-teal-500'
                             : 'bg-black/20 text-gray-400 border-white/5 hover:bg-white/5'}
@@ -418,6 +444,23 @@ function AlertsPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* Recipient Phone Number */}
+              <div>
+                <label className="block text-gray-400 font-bold uppercase tracking-wider mb-1.5 text-[10px]">
+                  Recipient Test Phone Number (Verified Twilio Recipient)
+                </label>
+                <input
+                  type="tel"
+                  value={recipientPhone}
+                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  placeholder="+918607405507 or 10-digit mobile"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-white outline-none focus:border-teal-500 font-mono text-xs placeholder-gray-600"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Auto-formats to international E.164 (e.g. +91 8607405507). On Twilio Trial accounts, ensure number is verified in Twilio Console.
+                </p>
               </div>
 
               {/* Message Content & Preview */}
@@ -453,9 +496,10 @@ function AlertsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 font-bold text-white shadow-lg shadow-red-500/30 flex items-center gap-2"
+                  disabled={isSending}
+                  className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 font-bold text-white shadow-lg shadow-red-500/30 flex items-center gap-2 disabled:opacity-50"
                 >
-                  <Send className="w-3.5 h-3.5" /> Transmit Broadcast Now
+                  <Send className="w-3.5 h-3.5" /> {isSending ? 'Transmitting...' : 'Transmit Broadcast Now'}
                 </button>
               </div>
             </form>

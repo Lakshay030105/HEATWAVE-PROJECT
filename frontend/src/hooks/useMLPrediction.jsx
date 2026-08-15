@@ -58,7 +58,7 @@ export function useMLPrediction(selectedWard) {
     };
 
     fetchPrediction();
-  }, [selectedWard]); 
+  }, [selectedWard?.wardId]); 
 
   return { predictionData, isPredicting, predictionError };
 }
