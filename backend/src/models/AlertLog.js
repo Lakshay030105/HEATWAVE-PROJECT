@@ -14,7 +14,7 @@ const alertLogSchema = new mongoose.Schema({
   channel: { 
     type: String, 
     required: true, 
-    enum: ['sms', 'voice', 'push'] 
+    enum: ['sms', 'voice', 'push', 'whatsapp'] 
   },
   message: {
     type: String

@@ -1,6 +1,6 @@
-
 require('dotenv').config();
 const twilio = require('twilio');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 let client = null;
 const sid = process.env.TWILIO_ACCOUNT_SID || process.env.TWILIO_API_KEY_SID;
@@ -27,10 +27,14 @@ const TRIAL_SMS_TEMPLATES = {
   Low: 'sms_account_alerts',
 };
 
+/**
+ * Dispatch an SMS Alert via Twilio (with automatic normalization & trial fallback)
+ */
 exports.sendSMS = async (phoneNumber, wardNameOrMessage, riskTier, advisory, customMessage) => {
   try {
-    if (!phoneNumber) {
-      return { success: false, error: 'No recipient phone number configured' };
+    const cleanPhone = normalizePhoneNumber(phoneNumber);
+    if (!cleanPhone) {
+      return { success: false, error: 'Invalid or missing recipient phone number' };
     }
 
     // Determine the SMS body to send
@@ -46,50 +50,64 @@ exports.sendSMS = async (phoneNumber, wardNameOrMessage, riskTier, advisory, cus
     }
 
     const trialTemplate = TRIAL_SMS_TEMPLATES[riskTier] || process.env.TWILIO_SMS_TEMPLATE || 'sms_internal_alerts';
+    const fromPhone = normalizePhoneNumber(process.env.TWILIO_PHONE_NUMBER) || process.env.TWILIO_PHONE_NUMBER;
 
-    if (!client) {
-      console.log(`[MOCK TWILIO SMS] -> To: ${phoneNumber} | Body: ${bodyText}`);
-      return { success: true, sid: `mock_sms_${Date.now()}` };
+    if (!client || !fromPhone) {
+      console.log(`[MOCK TWILIO SMS] -> To: ${cleanPhone} | Body: ${bodyText}`);
+      return { success: true, sid: `mock_sms_${Date.now()}`, mock: true };
     }
 
     let message;
     try {
       // 1. Try sending the full informative custom message
       message = await client.messages.create({
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: phoneNumber,
+        from: fromPhone,
+        to: cleanPhone,
         body: bodyText,
       });
     } catch (sendErr) {
-      // 2. If Twilio trial account requires predefined template (Code 572006), dispatch trial template
-      if (sendErr.code === 572006 || (sendErr.message && sendErr.message.includes('predefined SMS templates'))) {
-        console.log(`ℹ️ Twilio trial account restriction detected (Code 572006). Sending trial template '${trialTemplate}' to ${phoneNumber}...`);
+      // 2. Handle Twilio trial restrictions (Code 572006 or 21614: template required)
+      if (
+        sendErr.code === 572006 ||
+        sendErr.code === 21614 ||
+        (sendErr.message && sendErr.message.includes('predefined SMS templates'))
+      ) {
+        console.log(`ℹ️ Twilio trial account restriction detected (Code ${sendErr.code || 572006}). Sending trial template '${trialTemplate}' to ${cleanPhone}...`);
         message = await client.messages.create({
-          from: process.env.TWILIO_PHONE_NUMBER,
-          to: phoneNumber,
+          from: fromPhone,
+          to: cleanPhone,
           body: trialTemplate,
         });
+      } else if (sendErr.code === 21608) {
+        // Unverified number on trial account
+        const errorMsg = `Recipient ${cleanPhone} is unverified. Trial accounts require verified numbers at twilio.com/console/phone-numbers/verified.`;
+        console.warn(`⚠️ Twilio notice (Code 21608): ${errorMsg}`);
+        return { success: false, code: 21608, error: errorMsg };
       } else {
         throw sendErr;
       }
     }
 
-    console.log(`✅ Alert SMS successfully sent to ${phoneNumber}. SID: ${message.sid}`);
-    return { success: true, sid: message.sid };
+    console.log(`✅ Alert SMS successfully sent to ${cleanPhone}. SID: ${message.sid}`);
+    return { success: true, sid: message.sid, to: cleanPhone };
   } catch (error) {
     console.error(`❌ Twilio SMS Error for ${phoneNumber}:`, error.message);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, code: error.code };
   }
 };
 
+/**
+ * Dispatch a WhatsApp Alert via Twilio (with automatic normalization & sandbox handling)
+ */
 exports.sendWhatsApp = async (phoneNumber, wardNameOrMessage, riskTier, advisory, customMessage) => {
   try {
-    if (!phoneNumber) {
-      return { success: false, error: 'No recipient phone number configured' };
+    const rawClean = normalizePhoneNumber(phoneNumber);
+    if (!rawClean) {
+      return { success: false, error: 'Invalid or missing recipient phone number' };
     }
 
-    const cleanPhone = phoneNumber.replace(/[^0-9+]/g, '');
-    const to = cleanPhone.startsWith('whatsapp:') ? cleanPhone : `whatsapp:${cleanPhone}`;
+    const cleanDigits = rawClean.replace(/^whatsapp:/, '');
+    const to = `whatsapp:${cleanDigits}`;
     const from = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
 
     let bodyText = '';
@@ -105,19 +123,36 @@ exports.sendWhatsApp = async (phoneNumber, wardNameOrMessage, riskTier, advisory
 
     if (!client) {
       console.log(`[MOCK TWILIO WHATSAPP] -> To: ${to} | Body: ${bodyText}`);
-      return { success: true, sid: `mock_wa_${Date.now()}` };
+      return { success: true, sid: `mock_wa_${Date.now()}`, mock: true };
     }
 
-    const message = await client.messages.create({
-      from,
-      to,
-      body: bodyText,
-    });
-
-    console.log(`✅ WhatsApp Alert successfully sent to ${to}. SID: ${message.sid}`);
-    return { success: true, sid: message.sid };
+    let message;
+    try {
+      message = await client.messages.create({
+        from,
+        to,
+        body: bodyText,
+      });
+      console.log(`✅ WhatsApp Alert successfully sent to ${to}. SID: ${message.sid}`);
+      return { success: true, sid: message.sid, to };
+    } catch (waErr) {
+      // Handle WhatsApp Sandbox / ContentSid restrictions gracefully
+      if (
+        waErr.code === 63016 ||
+        waErr.code === 63015 ||
+        (waErr.message && waErr.message.includes('ContentSid'))
+      ) {
+        console.warn(`ℹ️ Twilio WhatsApp policy note (Code ${waErr.code || 63016}): Recipient must join Twilio sandbox by sending 'join <sandbox-keyword>' to +14155238886.`);
+        return {
+          success: false,
+          code: waErr.code || 63016,
+          error: `WhatsApp Sandbox restriction: Recipient ${cleanDigits} has not opted into the Twilio Sandbox. Send 'join <sandbox-keyword>' to +14155238886 first.`,
+        };
+      }
+      throw waErr;
+    }
   } catch (error) {
     console.error(`❌ Twilio WhatsApp Error for ${phoneNumber}:`, error.message);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, code: error.code };
   }
 };

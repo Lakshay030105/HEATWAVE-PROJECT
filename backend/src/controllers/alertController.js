@@ -1,7 +1,6 @@
-
-
 const AlertLog = require('../models/AlertLog');
 const twilioService = require('../services/twilioService');
+const { normalizePhoneNumber, maskPhoneNumber } = require('../utils/phoneUtils');
 
 // 1. Fetch recent alerts with optional ward filtering and phone masking
 exports.getAlerts = async (req, res, next) => {
@@ -18,9 +17,7 @@ exports.getAlerts = async (req, res, next) => {
 
     const maskedAlerts = alerts.map(alert => {
       if (alert.recipientPhone) {
-        const phoneStr = String(alert.recipientPhone);
-        const last4 = phoneStr.slice(-4);
-        alert.recipientPhone = `******${last4}`;
+        alert.recipientPhone = maskPhoneNumber(alert.recipientPhone);
       }
       return alert;
     });
@@ -44,34 +41,39 @@ exports.createAlert = async (req, res, next) => {
 
     const alertChannel = channel || 'sms';
     let dispatchStatus = status || 'sent';
+    let dispatchResult = null;
+
+    // Normalize phone number (prioritizing custom recipientPhone, then environment variable)
+    const rawPhone = recipientPhone || process.env.MY_PHONE_NUMBER;
+    const targetPhone = normalizePhoneNumber(rawPhone);
 
     // If SMS channel, trigger real Twilio dispatch to target phone or verified test number
     if (alertChannel === 'sms') {
-      const targetPhone = recipientPhone || process.env.MY_PHONE_NUMBER;
       if (targetPhone) {
-        const smsResult = await twilioService.sendSMS(
+        dispatchResult = await twilioService.sendSMS(
           targetPhone,
           wardId,
           tier,
           message || `Heat alert for ward ${wardId}`,
           message
         );
-        if (!smsResult.success) {
-          console.warn(`Twilio broadcast dispatch notice for ${targetPhone}: ${smsResult.error}`);
+        dispatchStatus = dispatchResult.success ? 'sent' : 'failed';
+        if (!dispatchResult.success) {
+          console.warn(`Twilio broadcast dispatch notice for ${targetPhone}: ${dispatchResult.error}`);
         }
       }
     } else if (alertChannel === 'whatsapp') {
-      const targetPhone = recipientPhone || process.env.MY_PHONE_NUMBER;
       if (targetPhone) {
-        const waResult = await twilioService.sendWhatsApp(
+        dispatchResult = await twilioService.sendWhatsApp(
           targetPhone,
           wardId,
           tier,
           message || `Heat alert for ward ${wardId}`,
           message
         );
-        if (!waResult.success) {
-          console.warn(`Twilio WhatsApp dispatch notice for ${targetPhone}: ${waResult.error}`);
+        dispatchStatus = dispatchResult.success ? 'sent' : 'failed';
+        if (!dispatchResult.success) {
+          console.warn(`Twilio WhatsApp dispatch notice for ${targetPhone}: ${dispatchResult.error}`);
         }
       }
     }
@@ -82,13 +84,17 @@ exports.createAlert = async (req, res, next) => {
       channel: alertChannel,
       message: message || '',
       recipientCount: recipientCount || 10000,
-      recipientPhone: recipientPhone || process.env.MY_PHONE_NUMBER || undefined,
+      recipientPhone: targetPhone || undefined,
       dedupeKey: `broadcast-${wardId}-${Date.now()}`,
       status: dispatchStatus,
       sentAt: new Date()
     });
 
-    res.status(201).json({ success: true, data: alert });
+    res.status(201).json({ 
+      success: true, 
+      data: alert,
+      dispatchResult
+    });
   } catch (err) {
     console.error("Error creating alert:", err);
     if (next) return next(err);

@@ -1,11 +1,11 @@
 // In-memory / DB state for Emergency Fleet Units (108 Ambulances, PHED Tankers, Mobile Clinics)
 let EMERGENCY_UNITS = [
-  { id: 'AMB-101', code: '108-JAI-NORTH', type: 'ambulance', baseStation: 'SMS Hospital Base', assignedWard: 'JPR-W03', status: 'on_scene', crew: 'Dr. Sharma + 1 EMT', lat: 26.905, lng: 75.802, etaMins: 0, battery: 94 },
-  { id: 'AMB-102', code: '108-JAI-SOUTH', type: 'ambulance', baseStation: 'Mahatma Gandhi Hospital', assignedWard: 'JPR-W05', status: 'dispatched', crew: 'EMT Verma + Driver', lat: 26.808, lng: 75.795, etaMins: 4, battery: 88 },
+  { id: 'AMB-101', code: '108-JAI-NORTH', type: 'ambulance', baseStation: 'SMS Hospital Base', assignedWard: 'JAI-W07', status: 'on_scene', crew: 'Dr. Sharma + 1 EMT', lat: 26.905, lng: 75.802, etaMins: 0, battery: 94 },
+  { id: 'AMB-102', code: '108-JAI-SOUTH', type: 'ambulance', baseStation: 'Mahatma Gandhi Hospital', assignedWard: 'JAI-W05', status: 'dispatched', crew: 'EMT Verma + Driver', lat: 26.808, lng: 75.795, etaMins: 4, battery: 88 },
   { id: 'AMB-103', code: '108-JAI-WEST', type: 'ambulance', baseStation: 'Vaishali Urban Clinic', assignedWard: null, status: 'available', crew: 'EMT Rathore + Driver', lat: 26.912, lng: 75.742, etaMins: 0, battery: 100 },
-  { id: 'TNK-201', code: 'PHED-TANKER-01', type: 'water_tanker', baseStation: 'Civil Lines Water Works', assignedWard: 'JPR-W02', status: 'dispatched', crew: 'Driver Kuldeep', lat: 26.862, lng: 75.762, etaMins: 8, capacityLiters: 10000 },
+  { id: 'TNK-201', code: 'PHED-TANKER-01', type: 'water_tanker', baseStation: 'Civil Lines Water Works', assignedWard: 'JAI-W04', status: 'dispatched', crew: 'Driver Kuldeep', lat: 26.862, lng: 75.762, etaMins: 8, capacityLiters: 10000 },
   { id: 'TNK-202', code: 'PHED-TANKER-02', type: 'water_tanker', baseStation: 'Bani Park Depot', assignedWard: null, status: 'available', crew: 'Driver Mohan', lat: 26.912, lng: 75.742, etaMins: 0, capacityLiters: 10000 },
-  { id: 'CLINIC-301', code: 'HEAT-MOBILE-01', type: 'mobile_clinic', baseStation: 'Jaipur Nagar Nigam HQ', assignedWard: 'JPR-W05', status: 'on_scene', crew: '2 Nurses + ORS inventory', lat: 26.812, lng: 75.789, etaMins: 0, capacityTreated: 42 }
+  { id: 'CLINIC-301', code: 'HEAT-MOBILE-01', type: 'mobile_clinic', baseStation: 'Jaipur Nagar Nigam HQ', assignedWard: 'JAI-W05', status: 'on_scene', crew: '2 Nurses + ORS inventory', lat: 26.812, lng: 75.789, etaMins: 0, capacityTreated: 42 }
 ];
 
 // GET /api/emergency/units
