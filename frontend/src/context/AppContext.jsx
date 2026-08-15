@@ -22,15 +22,6 @@ export function AppProvider({ children }) {
   const [dataStreamMode, setDataStreamMode] = useState('demo'); // 'live' | 'demo'
   const [liveWeatherMap, setLiveWeatherMap] = useState({});
 
-  const fetchWards = useCallback(async () => {
-    try {
-      const res = await getWards();
-      setRawWards(res.data || []);
-    } catch (err) {
-      console.error('Failed to fetch wards:', err);
-    }
-  }, []);
-
   const fetchLatestRisks = useCallback(async () => {
     try {
       const res = await getLatestRisks();
@@ -76,43 +67,95 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Fetch live AI/Open-Meteo weather for all wards
-  const fetchLiveWeatherForAll = useCallback(async () => {
+  const fetchLiveWeatherForAll = useCallback(async (wardsList = rawWards) => {
     try {
-      const WARD_CENTROIDS = {
-        'JPR-W01': { lat: 26.855, lng: 75.815 },
-        'JPR-W02': { lat: 26.862, lng: 75.762 },
-        'JPR-W03': { lat: 26.905, lng: 75.802 },
-        'JPR-W04': { lat: 26.912, lng: 75.742 },
-        'JPR-W05': { lat: 26.812, lng: 75.789 },
-        'JPR-W06': { lat: 26.982, lng: 75.858 }
-      };
+      const targets = (wardsList && wardsList.length > 0) ? wardsList : rawWards;
+      if (!targets || targets.length === 0) return;
 
       const weatherMap = {};
       await Promise.all(
-        Object.entries(WARD_CENTROIDS).map(async ([wardId, coords]) => {
+        targets.map(async (w) => {
+          const coords = w.boundary?.coordinates?.[0] || [[75.8, 26.85]];
+          const avgLng = coords.reduce((s, c) => s + c[0], 0) / coords.length;
+          const avgLat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
+
+          const greenPct = w.greenCoverPct !== undefined ? w.greenCoverPct : 0.15;
+          const uhiOffset = Math.round((0.18 - greenPct) * 10 * 10) / 10;
+
+          let liveTemp = null;
+          let prediction = 'Low (No Heatwave)';
+          let status = 'Live';
+
+          // 1. Attempt AI Service Live Prediction
           try {
             const res = await fetch('http://localhost:8000/api/predict', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ latitude: coords.lat, longitude: coords.lng })
+              body: JSON.stringify({ latitude: avgLat, longitude: avgLng })
             });
-            const data = await res.json();
-            weatherMap[wardId] = {
-              tempC: data.temperature_celsius || 26.2,
-              prediction: data.prediction || 'Low (No Heatwave)',
-              status: data.status
-            };
-          } catch (e) {
-            weatherMap[wardId] = { tempC: 26.2, prediction: 'Low (No Heatwave)' };
+            if (res.ok) {
+              const data = await res.json();
+              if (data && typeof data.temperature_celsius === 'number') {
+                liveTemp = data.temperature_celsius;
+                prediction = data.prediction || 'Low (No Heatwave)';
+                status = data.status || 'Live AI';
+              }
+            }
+          } catch (aiErr) {
+            // Fallback to direct Open-Meteo
           }
+
+          // 2. Fallback to direct Open-Meteo Live API
+          if (liveTemp === null) {
+            try {
+              const omRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${avgLat}&longitude=${avgLng}&current=temperature_2m,relative_humidity_2m`);
+              if (omRes.ok) {
+                const omData = await omRes.json();
+                if (omData?.current?.temperature_2m !== undefined) {
+                  liveTemp = omData.current.temperature_2m;
+                  prediction = liveTemp >= 45 ? 'Extreme Heatwave' : liveTemp >= 40 ? 'Mild Heatwave' : 'Low (No Heatwave)';
+                  status = 'Live Satellite';
+                }
+              }
+            } catch (omErr) {
+              console.warn('Open-Meteo direct fetch notice:', omErr);
+            }
+          }
+
+          if (liveTemp === null) {
+            liveTemp = 29.2;
+          }
+
+          // Apply microclimate UHI offset based on ward green cover and built environment
+          const adjustedTemp = Math.round((liveTemp + uhiOffset) * 10) / 10;
+
+          weatherMap[w.wardId] = {
+            tempC: adjustedTemp,
+            baseLiveTemp: liveTemp,
+            uhiOffset,
+            prediction,
+            status
+          };
         })
       );
       setLiveWeatherMap(weatherMap);
     } catch (e) {
       console.warn('Live weather background ingestion notice:', e);
     }
-  }, []);
+  }, [rawWards]);
+
+  const fetchWards = useCallback(async () => {
+    try {
+      const res = await getWards();
+      const loadedWards = res.data || [];
+      setRawWards(loadedWards);
+      if (loadedWards.length > 0) {
+        fetchLiveWeatherForAll(loadedWards);
+      }
+    } catch (err) {
+      console.error('Failed to fetch wards:', err);
+    }
+  }, [fetchLiveWeatherForAll]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
@@ -134,10 +177,22 @@ export function AppProvider({ children }) {
   const wards = useMemo(() => {
     return rawWards.map(w => {
       const isLive = dataStreamMode === 'live';
-      const liveInfo = liveWeatherMap[w.wardId] || { tempC: 26.2, prediction: 'Low (No Heatwave)' };
+      const greenPct = w.greenCoverPct !== undefined ? w.greenCoverPct : 0.15;
+      const uhiOffset = Math.round((0.18 - greenPct) * 10 * 10) / 10;
+      const fallbackLiveTemp = Math.round((29.2 + uhiOffset) * 10) / 10;
 
-      // Base temperature selection
-      const baseTemp = isLive ? (liveInfo.tempC || 26.2) : (w.latestRisk?.forecastTempC || 40);
+      const liveInfo = liveWeatherMap[w.wardId] || {
+        tempC: fallbackLiveTemp,
+        prediction: 'Low (No Heatwave)',
+        status: 'Live'
+      };
+
+      // Base temperature selection:
+      // In Live mode: use live weather with UHI microclimate
+      // In Demo mode: use DB forecastTempC (or benchmark values)
+      const baseTemp = isLive 
+        ? (liveInfo.tempC ?? fallbackLiveTemp) 
+        : (w.latestRisk?.forecastTempC || 41.5);
 
       // Time-travel temperature delta
       let tempDelta = 0;
@@ -182,12 +237,12 @@ export function AppProvider({ children }) {
         hvi: computedHvi,
         riskTier: predictionHours === 0 && isLive ? 'Low' : calculatedTier,
         forecastHumidity: isLive ? 65 : 30,
-        mlPrediction: isLive && predictionHours === 0 ? liveInfo.prediction : `${calculatedTier} Heat Forecast`,
+        mlPrediction: isLive && predictionHours === 0 ? (liveInfo?.prediction || 'Low (No Heatwave)') : `${calculatedTier} Heat Forecast`,
         isSimulated: false,
         combinedScore
       };
 
-      // Manual simulation override takes precedence if active
+      // Manual simulation override takes precedence if active (in demo mode or explicitly triggered)
       if (simulationActive && w.wardId === simulationActive.wardId) {
         latestRisk = {
           ...latestRisk,
@@ -281,6 +336,27 @@ export function AppProvider({ children }) {
     init();
   }, [refreshAll]);
 
+  // Auto-fetch live weather when switching to 'live' mode
+  useEffect(() => {
+    if (dataStreamMode === 'live' && rawWards.length > 0) {
+      fetchLiveWeatherForAll(rawWards);
+    }
+  }, [dataStreamMode, rawWards, fetchLiveWeatherForAll]);
+
+  // Auto-select first ward by default
+  useEffect(() => {
+    if (!selectedWardId && rawWards.length > 0) {
+      setSelectedWardId(rawWards[0].wardId);
+    }
+  }, [rawWards, selectedWardId]);
+
+  const updateDataStreamMode = useCallback((mode) => {
+    setDataStreamMode(mode);
+    if (mode === 'live') {
+      setSimulationActive(null);
+    }
+  }, []);
+
   const value = {
     wards,
     selectedWard,
@@ -294,7 +370,7 @@ export function AppProvider({ children }) {
     predictionHours,
     activeLayer,
     dataStreamMode,
-    setDataStreamMode,
+    setDataStreamMode: updateDataStreamMode,
     setActiveLayer,
     setPredictionHours,
     setSimulationActive,

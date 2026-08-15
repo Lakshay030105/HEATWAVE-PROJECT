@@ -15,8 +15,8 @@ exports.getRiskHistory = async (req, res, next) => {
       res.status(200).json({ success: true, data: history });
   } catch (err) {
     console.error("Error fetching risk history:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error fetching risk history" });
-    if (next) next(err);
   }
 };
 
@@ -45,7 +45,7 @@ exports.getLatestRisks = async (req, res, next) => {
     res.status(200).json({ success: true, data: latestRisks });
   } catch (err) {
     console.error("Error fetching latest risks:", err);
+    if (next) return next(err);
     res.status(500).json({ success: false, message: "Server error fetching latest risks" });
-    if (next) next(err);
   }
 };

@@ -21,12 +21,15 @@ function SimulationToggle() {
   const [toastMessage, setToastMessage] = useState('');
 
   const handleSimulate = async () => {
-    if (!selectedWard) return;
+    const targetWard = selectedWard || wards[0];
+    if (!targetWard) return;
     setIsLoading(true);
     try {
-      await simulateHeatwave(selectedWard.wardId, tier);
-      setSimulationActive({ wardId: selectedWard.wardId, tier });
+      const res = await simulateHeatwave(targetWard.wardId, tier);
+      setSimulationActive({ wardId: targetWard.wardId, tier });
       setIsSimulated(true);
+      setToastMessage(`⚡ ${tier} Heat Spike (${targetWard.name})! SMS alert dispatched to phone.`);
+      setTimeout(() => setToastMessage(''), 4000);
       await refreshAll();
     } catch (err) {
       console.error(err);
@@ -103,12 +106,11 @@ function SimulationToggle() {
         <div>
           <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Target Ward</label>
           <select 
-            value={selectedWard?.wardId || ''} 
+            value={selectedWard?.wardId || (wards[0]?.wardId || '')} 
             onChange={(e) => selectWard(e.target.value)}
             className="app-select cursor-pointer text-xs"
             disabled={isSimulated}
           >
-            <option value="" className="bg-[#0B0E14] text-gray-400">-- Choose Ward --</option>
             {wards.map(w => (
               <option key={w.wardId} value={w.wardId} className="bg-[#0B0E14] text-white">
                 {w.name} ({w.wardId}) — {w.latestRisk?.forecastTempC}°C
@@ -135,9 +137,9 @@ function SimulationToggle() {
       <div className="flex items-center gap-2">
         <button
           onClick={handleSimulate}
-          disabled={!selectedWard || isLoading || isSimulated}
+          disabled={isLoading || isSimulated || wards.length === 0}
           className={`flex-1 h-10 flex items-center justify-center gap-2 rounded-lg text-xs font-bold text-white transition-all duration-200 cursor-pointer
-            ${!selectedWard || isSimulated 
+            ${isSimulated || wards.length === 0
               ? 'opacity-50 cursor-not-allowed bg-gray-800 border border-white/10' 
               : 'bg-gradient-to-r from-orange-500 to-red-600 shadow-md shadow-red-500/20 hover:shadow-lg hover:shadow-red-500/30 border border-red-400/30'
             }

@@ -13,6 +13,11 @@ class AppError extends Error {
   const errorHandler = (err, req, res, next) => {
     // 1. Log the error to the server console
     console.error(`❌ ${err.message}`, err.stack);
+
+    // If response headers were already sent by previous middleware, delegate to default Express handler
+    if (res.headersSent) {
+      return next(err);
+    }
   
     // 2. Determine the status code (default to 500 Internal Server Error)
     const statusCode = err.statusCode || 500;
