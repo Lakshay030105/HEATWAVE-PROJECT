@@ -203,24 +203,38 @@ export function AppProvider({ children }) {
         status: 'Live'
       };
 
-      // Base temperature selection:
-      // In Live mode: use live weather with UHI microclimate
-      // In Demo mode: use DB forecastTempC (or benchmark values)
-      const baseTemp = isLive 
-        ? (liveInfo.tempC ?? fallbackLiveTemp) 
+      // ── Demo mode, Current (0h): trust backend / ML data as-is ──
+      if (!isLive && predictionHours === 0) {
+        let latestRisk = { ...w.latestRisk };
+
+        // Manual simulation override if active
+        if (simulationActive && w.wardId === simulationActive.wardId) {
+          latestRisk = {
+            ...latestRisk,
+            riskTier: simulationActive.tier,
+            isSimulated: true
+          };
+        }
+
+        return { ...w, latestRisk };
+      }
+
+      // ── Live mode OR time-travel predictions: compute projected values ──
+      const baseTemp = isLive
+        ? (liveInfo.tempC ?? fallbackLiveTemp)
         : (w.latestRisk?.forecastTempC || 41.5);
 
       // Time-travel temperature delta
       let tempDelta = 0;
       if (predictionHours === 3) tempDelta = isLive ? 2.5 : 1.5;
-      else if (predictionHours === 6) tempDelta = isLive ? 7.0 : 3.0; // Peak afternoon solar heating
-      else if (predictionHours === 12) tempDelta = isLive ? -3.5 : -2.0; // Night cooling
-      else if (predictionHours === 24) tempDelta = isLive ? 6.0 : 2.5; // Next day
-      else if (predictionHours === 48) tempDelta = isLive ? 10.5 : 4.0; // Multi-day heatwave escalation
+      else if (predictionHours === 6) tempDelta = isLive ? 7.0 : 3.0;
+      else if (predictionHours === 12) tempDelta = isLive ? -3.5 : -2.0;
+      else if (predictionHours === 24) tempDelta = isLive ? 6.0 : 2.5;
+      else if (predictionHours === 48) tempDelta = isLive ? 10.5 : 4.0;
 
       const forecastTemp = Math.round((baseTemp + tempDelta) * 10) / 10;
 
-      // Dynamic HVI computation for the forecasted temperature
+      // Dynamic HVI computation for projected temperature
       const tempMin = isLive ? 20 : 30;
       const tempRange = isLive ? 22 : 20;
       const lstNorm = Math.min(100, Math.max(0, ((forecastTemp - tempMin) / tempRange) * 100));
@@ -246,25 +260,22 @@ export function AppProvider({ children }) {
       else if (combinedScore > 50 || forecastTemp >= (isLive ? 35 : 42)) calculatedTier = 'Severe';
       else if (combinedScore > 25 || forecastTemp >= (isLive ? 30 : 39)) calculatedTier = 'Moderate';
 
-      // Default baseline when slider is at 0h (Current)
       let latestRisk = {
         ...w.latestRisk,
         forecastTempC: forecastTemp,
         hvi: computedHvi,
-        riskTier: predictionHours === 0 && isLive ? 'Low' : calculatedTier,
+        riskTier: calculatedTier,
         forecastHumidity: isLive ? 65 : 30,
         mlPrediction: isLive && predictionHours === 0 ? (liveInfo?.prediction || 'Low (No Heatwave)') : `${calculatedTier} Heat Forecast`,
         isSimulated: false,
         combinedScore
       };
 
-      // Manual simulation override takes precedence if active (in demo mode or explicitly triggered)
+      // Manual simulation override takes precedence if active
       if (simulationActive && w.wardId === simulationActive.wardId) {
         latestRisk = {
           ...latestRisk,
           riskTier: simulationActive.tier,
-          forecastTempC: simulationActive.tier === 'Extreme' ? 48 : simulationActive.tier === 'Severe' ? 45 : 42,
-          hvi: simulationActive.tier === 'Extreme' ? 95 : 82,
           isSimulated: true
         };
       }
@@ -275,6 +286,7 @@ export function AppProvider({ children }) {
       };
     });
   }, [rawWards, simulationActive, predictionHours, dataStreamMode, liveWeatherMap]);
+
 
   // Selected ward memo
   const selectedWard = useMemo(() => {

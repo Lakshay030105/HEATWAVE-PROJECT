@@ -403,22 +403,7 @@ function RiskMapPage() {
             </div>
           </div>
 
-          {/* AI Decision Summary Box */}
-          <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 mb-6">
-            <div className="flex items-center gap-2 text-purple-300 text-xs font-bold mb-2">
-              <Info className="w-4 h-4" /> AI Risk Fusion Formula
-            </div>
-            <p className="text-[11px] text-gray-300 leading-relaxed font-mono">
-              Combined = 0.6 × HVI ({selectedWard?.latestRisk?.hvi}) + 0.4 × Weather Severity
-            </p>
-            <div className="mt-2 text-xs text-purple-200">
-              {selectedWard?.latestRisk?.riskTier === 'Extreme'
-                ? '🔴 Immediate emergency cooling & public advisory trigger required.'
-                : selectedWard?.latestRisk?.riskTier === 'Severe'
-                ? '🟠 Pre-stage water tankers and open nearby cooling relief centers.'
-                : '🟢 Routine monitoring active. No intervention threshold breached.'}
-            </div>
-          </div>
+
 
           {/* Quick Ward Navigation List */}
           <div className="mt-auto">
