@@ -130,7 +130,7 @@ const LAYERS = [
 const TIMELINE_STEPS = [
   { hours: 0, label: 'Current' },
   { hours: 3, label: '+3 Hours' },
-  { hours: 6, label: '+6 Hours (Peak)' },
+  { hours: 6, label: '+6 Hours' },
   { hours: 12, label: '+12 Hours' },
   { hours: 24, label: '+24 Hours (Tomorrow)' },
   { hours: 48, label: '+48 Hours (2-Day AI)' },
