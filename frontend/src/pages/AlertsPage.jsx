@@ -100,7 +100,7 @@ function AlertsPage() {
   const totalCitizensReached = alerts.reduce((sum, a) => sum + (a.recipientCount || 15000), 0);
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 md:p-8 flex flex-col gap-8 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 md:gap-8 font-sans">
       
       {/* Header with New Dispatch Action */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -183,7 +183,7 @@ function AlertsPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 text-xs">
           <div className="p-4 rounded-xl bg-black/30 border border-red-500/20 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -256,8 +256,8 @@ function AlertsPage() {
         </div>
 
         {/* Logs Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left text-xs min-w-[700px]">
             <thead>
               <tr className="text-gray-400 border-b border-white/10 font-bold uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-4">Ward / Target</th>
@@ -369,7 +369,7 @@ function AlertsPage() {
             <form onSubmit={handleSendBroadcast} className="p-6 space-y-4 text-xs font-sans">
               
               {/* Target Zone & Tier */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-400 font-bold uppercase tracking-wider mb-1.5 text-[10px]">Target Zone</label>
                   <select
@@ -399,7 +399,7 @@ function AlertsPage() {
               </div>
 
               {/* Delivery Channel & Language */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-400 font-bold uppercase tracking-wider mb-1.5 text-[10px]">Broadcast Channel</label>
                   <div className="grid grid-cols-4 gap-1.5">

@@ -23,21 +23,21 @@ function AuthorityDashboard() {
   const { selectedWard } = useApp();
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 md:p-8 flex flex-col gap-8 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 md:gap-8 font-sans">
 
       {/* Top Stat Cards */}
       <StatCards />
 
       {/* Map + Sidebar Hero Row (560px Height) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-stretch min-h-[560px] lg:h-[560px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4 md:gap-6 items-stretch">
         
         {/* Main Map Area */}
-        <div className="glass-panel relative w-full h-[560px] min-h-[400px] overflow-hidden">
+        <div className="glass-panel relative w-full h-[350px] md:h-[450px] lg:h-[560px] min-h-[300px] overflow-hidden">
           <HeatMap />
         </div>
 
         {/* Right Sidebar Controls */}
-        <div className="flex flex-col gap-6 h-[560px] overflow-hidden">
+        <div className="flex flex-col gap-4 md:gap-6 lg:h-[560px] overflow-hidden">
           
           {/* Simulation Demo Control Panel */}
           <SimulationToggle />

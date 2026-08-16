@@ -106,7 +106,7 @@ function AnalyticsPage() {
   };
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 md:p-8 flex flex-col gap-8 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 md:gap-8 font-sans">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -122,7 +122,7 @@ function AnalyticsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors"
@@ -268,8 +268,8 @@ function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left text-xs min-w-[700px]">
             <thead>
               <tr className="text-gray-400 border-b border-white/10 font-bold uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-4">Ward Name</th>

@@ -55,7 +55,7 @@ function SheltersPage() {
   };
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 md:p-8 flex flex-col gap-8 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-5 md:gap-8 font-sans">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -121,7 +121,7 @@ function SheltersPage() {
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="scroll-pills">
           {['ALL', 'cooling_center', 'water_station'].map(type => (
             <button
               key={type}

@@ -109,24 +109,24 @@ function StatCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full font-sans">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 w-full font-sans">
       {cards.map((c) => {
         const Icon = c.icon;
         return (
-          <div key={c.label} className="glass-panel p-4 flex items-center gap-3.5 hover:border-white/20 transition-all">
-            <div className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${c.iconBg}`}>
-              <Icon className={`w-5 h-5 ${c.iconColor}`} />
+          <div key={c.label} className="glass-panel p-3 md:p-4 flex items-center gap-2.5 md:gap-3.5 hover:border-white/20 transition-all">
+            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl border flex items-center justify-center shrink-0 ${c.iconBg}`}>
+              <Icon className={`w-4 h-4 md:w-5 md:h-5 ${c.iconColor}`} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">{c.label}</div>
-              <div className="text-xl font-bold tabular-data truncate" style={{ color: c.valueColor || '#f1f5f9' }}>
+              <div className="text-lg md:text-xl font-bold tabular-data truncate" style={{ color: c.valueColor || '#f1f5f9' }}>
                 {c.value}
               </div>
               <div className="text-[11px] text-gray-400 truncate">{c.sub}</div>
             </div>
             {c.badge && (
               <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shrink-0"
+                className="text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 rounded-full border uppercase tracking-wider shrink-0 hidden sm:block"
                 style={{
                   color: c.badgeColor,
                   borderColor: `${c.badgeColor}40`,

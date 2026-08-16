@@ -11,7 +11,7 @@ import CitizenReportsPage from './pages/CitizenReportsPage';
 import Sidebar from './components/Sidebar/Sidebar';
 import { useApp } from './context/AppContext';
 import AarogyaBrand from './components/Logo/Logo';
-import { ShieldAlert, Menu, Radio, Flame, Sparkles } from 'lucide-react';
+import { ShieldAlert, Menu, Radio, Flame, Gauge, MapPinned, Bell, Users } from 'lucide-react';
 
 function App() {
   const { loading, wards, dataStreamMode, setDataStreamMode } = useApp();
@@ -27,18 +27,19 @@ function App() {
 
   const totalWards = wards.length;
   const isCitizenView = location.pathname === '/citizen';
+  const isMapPage = location.pathname === '/map';
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-[#0B0E14] text-slate-100">
+    <div className={`min-h-screen flex flex-col font-sans bg-[#0B0E14] text-slate-100 ${isMapPage ? 'h-screen overflow-hidden' : ''}`}>
       
       {/* Sidebar (hamburger-triggered, sits alongside the top navbar) */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Navigation Bar (Fixed 64px height, vertically centered, no clipping) */}
-      <header className="w-full h-16 px-6 lg:px-8 flex items-center justify-between border-b border-white/10 bg-[#0B0E14] sticky top-0 z-50 gap-4">
+      {/* Navigation Bar */}
+      <header className="w-full h-14 md:h-16 px-3 md:px-6 lg:px-8 flex items-center justify-between border-b border-white/10 bg-[#0B0E14] sticky top-0 z-50 gap-2 md:gap-4 shrink-0">
         
         {/* Hamburger + Logo & Brand */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors -ml-1"
@@ -49,10 +50,10 @@ function App() {
           <AarogyaBrand />
         </div>
 
-        {/* Center/Right Controls: Data Stream Toggle + Navigation */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Center/Right Controls: Data Stream Toggle + Navigation (hidden on mobile, accessible via sidebar) */}
+        <div className="hidden md:flex items-center gap-3 shrink-0">
           {/* Data Mode Switcher (Live vs Demo) */}
-          <div className="hidden sm:flex items-center gap-1 bg-black/60 border border-white/10 p-1 rounded-full text-xs">
+          <div className="hidden lg:flex items-center gap-1 bg-black/60 border border-white/10 p-1 rounded-full text-xs">
             <button
               onClick={() => setDataStreamMode('live')}
               className={`px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
@@ -132,44 +133,57 @@ function App() {
             </NavLink>
           </nav>
         </div>
+
+        {/* Mobile: compact data mode indicator */}
+        <div className="flex md:hidden items-center gap-2 shrink-0">
+          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1
+            ${dataStreamMode === 'live' 
+              ? 'bg-teal-500/15 text-teal-300 border-teal-500/30' 
+              : 'bg-red-500/15 text-red-400 border-red-500/30'
+            }
+          `}>
+            {dataStreamMode === 'live' ? '🛰️ Live' : '🔥 Demo'}
+          </span>
+        </div>
       </header>
 
       {/* Live Status Strip */}
       {!loading && wards.length > 0 && !isCitizenView && (
-        <div className="w-full px-8 py-2.5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between text-xs font-medium tabular-data overflow-x-auto gap-4">
-          <div className="flex items-center gap-6 shrink-0">
+        <div className="w-full px-4 md:px-8 py-2 md:py-2.5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between text-xs font-medium tabular-data overflow-x-auto gap-3 md:gap-4 shrink-0">
+          <div className="flex items-center gap-3 md:gap-6 shrink-0">
             <div className="flex items-center gap-2 shrink-0">
               <ShieldAlert className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-400 font-semibold">System Status: Live</span>
+              <span className="text-gray-400 font-semibold hidden sm:inline">System Status: Live</span>
+              <span className="text-gray-400 font-semibold sm:hidden">Live</span>
             </div>
-            <div className="w-px h-4 bg-gray-800 shrink-0" />
-            <div className="flex items-center gap-6 shrink-0">
-              <span className="text-gray-400">Total Wards: <strong className="text-white">{totalWards}</strong></span>
+            <div className="w-px h-4 bg-gray-800 shrink-0 hidden sm:block" />
+            <div className="flex items-center gap-3 md:gap-6 shrink-0">
+              <span className="text-gray-400 hidden sm:inline">Total Wards: <strong className="text-white">{totalWards}</strong></span>
               {(riskCounts['Extreme'] || 0) > 0 && (
                 <span className="flex items-center gap-1.5 text-red-400 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> {riskCounts['Extreme']} Extreme
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> {riskCounts['Extreme']} <span className="hidden sm:inline">Extreme</span>
                 </span>
               )}
               {(riskCounts['Severe'] || 0) > 0 && (
                 <span className="flex items-center gap-1.5 text-orange-400 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-orange-500" /> {riskCounts['Severe']} Severe
+                  <span className="w-2 h-2 rounded-full bg-orange-500" /> {riskCounts['Severe']} <span className="hidden sm:inline">Severe</span>
                 </span>
               )}
               {(riskCounts['Moderate'] || 0) > 0 && (
-                <span className="flex items-center gap-1.5 text-yellow-400 font-bold">
+                <span className="flex items-center gap-1.5 text-yellow-400 font-bold hidden sm:flex">
                   <span className="w-2 h-2 rounded-full bg-yellow-500" /> {riskCounts['Moderate']} Moderate
                 </span>
               )}
               {(riskCounts['Low'] || 0) > 0 && (
-                <span className="flex items-center gap-1.5 text-teal-400 font-bold">
+                <span className="flex items-center gap-1.5 text-teal-400 font-bold hidden sm:flex">
                   <span className="w-2 h-2 rounded-full bg-teal-500" /> {riskCounts['Low']} Safe
                 </span>
               )}
             </div>
           </div>
 
-          {/* Active Mode Indicator Pill */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Active Mode Indicator Pill — hidden on mobile (already in header) */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <span className="text-[11px] text-gray-500">Active Datastream:</span>
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border flex items-center gap-1.5
               ${dataStreamMode === 'live' 
@@ -193,7 +207,7 @@ function App() {
 
       {/* Routes */}
       {!loading && (
-        <main className="flex-1 w-full">
+        <main className={`flex-1 w-full ${isMapPage ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'pb-20 md:pb-0'}`}>
           <Routes>
             <Route path="/" element={<AuthorityDashboard />} />
             <Route path="/map" element={<RiskMapPage />} />
@@ -206,6 +220,26 @@ function App() {
           </Routes>
         </main>
       )}
+
+      {/* Mobile Bottom Tab Bar — visible only on mobile (< md) */}
+      <nav className="bottom-tab-bar md:hidden">
+        <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>
+          <Gauge className="w-5 h-5" />
+          <span>Dashboard</span>
+        </NavLink>
+        <NavLink to="/map" className={({ isActive }) => isActive ? 'active' : ''}>
+          <MapPinned className="w-5 h-5" />
+          <span>Risk Map</span>
+        </NavLink>
+        <NavLink to="/alerts" className={({ isActive }) => isActive ? 'active' : ''}>
+          <Bell className="w-5 h-5" />
+          <span>Alerts</span>
+        </NavLink>
+        <NavLink to="/citizen" className={({ isActive }) => isActive ? 'active' : ''}>
+          <Users className="w-5 h-5" />
+          <span>Citizen</span>
+        </NavLink>
+      </nav>
     </div>
   );
 }
