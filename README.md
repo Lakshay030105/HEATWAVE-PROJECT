@@ -1,4 +1,4 @@
-<![CDATA[# 🌡️ Aarogya — Urban Heatwave Early Warning & Monitoring System
+# 🌡️ Aarogya — Urban Heatwave Early Warning & Monitoring System
 
 > **Ward-level heat vulnerability indexing, ML-powered risk prediction, targeted multi-channel alerts, and real-time monitoring for Jaipur, India.**
 
@@ -436,4 +436,3 @@ This project was built for **Smart India Hackathon 2026 — SIET Internal Qualif
   <strong>「 Predictive · Targeted · Equitable 」</strong><br/>
   <em>Aarogya — Urban Heatwave Early Warning & Monitoring System</em>
 </p>
-]]>
